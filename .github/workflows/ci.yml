@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        db: [h2, postgres]
+    services:
+      postgres:
+        image: postgres:15
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: openid
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java, javascript
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            admin-ui/package-lock.json
+            account-ui/package-lock.json
+      - name: Build
+        run: mvn -q -DskipTests install
+        working-directory: auth-server
+      - name: Build Admin UI
+        run: npm ci && npm run build
+        working-directory: admin-ui
+      - name: Build Account UI
+        run: npm ci && npm run build
+        working-directory: account-ui
+      - name: Dependency audit (Admin UI)
+        run: npm audit --audit-level=high
+        working-directory: admin-ui
+      - name: Dependency audit (Account UI)
+        run: npm audit --audit-level=high
+        working-directory: account-ui
+      - name: Test (H2)
+        if: matrix.db == 'h2'
+        run: mvn -q test
+        working-directory: auth-server
+        env:
+          SMALLRYE_JWT_SIGN_KEY: 0123456789abcdef0123456789abcdef
+          SMALLRYE_JWT_SIGN_KEY_ALGORITHM: HS256
+      - name: Test (PostgreSQL)
+        if: matrix.db == 'postgres'
+        run: |
+          mvn -q test \
+            -Dquarkus.datasource.db-kind=postgresql \
+            -Dquarkus.datasource.jdbc.url=jdbc:postgresql://localhost:5432/openid \
+            -Dquarkus.datasource.username=postgres \
+            -Dquarkus.datasource.password=postgres \
+            -Dsmallrye.jwt.sign.key=0123456789abcdef0123456789abcdef \
+            -Dsmallrye.jwt.sign.key.algorithm=HS256
+        working-directory: auth-server
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3

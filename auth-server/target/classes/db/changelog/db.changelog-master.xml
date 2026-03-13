@@ -1,0 +1,112 @@
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.17.xsd">
+
+    <changeSet id="0001-initial-schema-postgresql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0001-initial-schema.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0002-security-tokens-postgresql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0002-security-tokens.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0003-audit-events-postgresql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0003-audit-events.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0001-initial-schema-h2" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="h2"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0001-initial-schema-h2.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0002-security-tokens-h2" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="h2"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0002-security-tokens-h2.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0003-audit-events-h2" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="h2"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0003-audit-events-h2.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0001-initial-schema-mysql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mysql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0001-initial-schema-mysql.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0002-security-tokens-mysql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mysql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0002-security-tokens-mysql.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0003-audit-events-mysql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mysql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0003-audit-events-mysql.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0001-initial-schema-mariadb" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mariadb"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0001-initial-schema-mariadb.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0002-security-tokens-mariadb" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mariadb"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0002-security-tokens-mariadb.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0003-audit-events-mariadb" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mariadb"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0003-audit-events-mariadb.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0001-initial-schema-oracle" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="oracle"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0001-initial-schema-oracle.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0002-security-tokens-oracle" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="oracle"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0002-security-tokens-oracle.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0003-audit-events-oracle" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="oracle"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0003-audit-events-oracle.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+</databaseChangeLog>
