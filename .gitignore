@@ -1,0 +1,15 @@
+Add the following lines to ignore common files
+// ... existing code ...
+# Ignore node_modules folder
+node_modules/
+# Ignore .env file
+.env
+// ... existing code ...# Ignore common folders and files
+node_modules/
+.env
+*.log
+*.db
+*.backup
+.idea/
+.vscode/
+.pyc
