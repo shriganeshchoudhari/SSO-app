@@ -6,16 +6,20 @@ import static org.hamcrest.Matchers.*;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
+import io.restassured.specification.RequestSpecification;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 @QuarkusTest
 public class PasswordResetAndEmailVerificationTest {
+  private RequestSpecification adminRequest() {
+    return given().header("Authorization", "Bearer test-bootstrap-token");
+  }
 
   @Test
   void password_reset_and_email_verify_flow() {
     // Create realm
-    Response realmResp = given()
+    Response realmResp = adminRequest()
         .contentType(ContentType.JSON)
         .body(Map.of("name", "demo2", "displayName", "Demo2"))
         .when().post("/admin/realms")
@@ -28,7 +32,7 @@ public class PasswordResetAndEmailVerificationTest {
     }
 
     // Create user with email
-    Response userResp = given()
+    Response userResp = adminRequest()
         .contentType(ContentType.JSON)
         .body(Map.of("username", "bob", "email", "bob@example.com", "enabled", true))
         .when().post("/admin/realms/" + realmId + "/users")
@@ -80,4 +84,3 @@ public class PasswordResetAndEmailVerificationTest {
         .body("access_token", not(isEmptyOrNullString()));
   }
 }
-

@@ -1,61 +1,147 @@
-# Technical/Technology Design (TTD) — OpenIdentity Core
+# Technical/Technology Design (TTD) - OpenIdentity Core
 
-## Architecture Summary
-- Java 21 + Quarkus runtime; Maven build; PostgreSQL; Infinispan (cache).
-- Frontend: React + TypeScript + PatternFly for Admin/Account Consoles.
-- Extensibility via SPIs (storage, authenticators, identity providers, policies).
+## Design Intent
+This TTD documents the technical baseline that exists in this repository today and the architectural direction required by the phased roadmap in `docs/PRD.md`. It is delivery-accurate: current runtime shape, current constraints, and planned evolution are described separately.
 
-## Modules
-- auth-server (protocol endpoints: OIDC/SAML, sessions, tokens)
-- admin-api (REST), account-api (REST)
-- admin-ui, account-ui
-- storage-jpa (Postgres), cache
-- federation-ldap (SPI), broker-oidc/saml (SPI)
-- events/audit, policy/authorization
+## Current Architecture
 
-## Runtime Ports (Dev)
-- Backend (auth-server): 7070
-- Admin UI (Vite dev server): 5000 (proxied to backend for /admin)
+### Runtime Shape
+- `auth-server`: primary backend service built with Java 21 and Quarkus 3.8.
+- `admin-ui`: React 18 + TypeScript + Vite admin console.
+- `account-ui`: React 18 + TypeScript + Vite account console.
+- Root `index.js`: auxiliary Express health-check server; not part of the main identity runtime path.
 
-## Database Support
-- PostgreSQL: primary production database (full schema, arrays/json optimized).
-- MySQL/MariaDB: supported; core schema for realms/users now, extended entities added incrementally.
-- Oracle: supported; core schema for realms/users uses CHAR(36) UUIDs and NUMBER(1) booleans.
-- H2: developer/testing profile with core tables (realm, iam_user) for fast feedback.
-- Liquibase dbms-specific changeSets select the appropriate migration per database.
+### Backend Stack
+- Quarkus REST endpoints with JSON serialization.
+- Hibernate ORM with JPA entities.
+- Liquibase-managed schema migrations.
+- JWT issuance through SmallRye JWT.
+- Scheduled cleanup for session expiry handling.
+- Database drivers included for PostgreSQL, H2, MySQL, MariaDB, and Oracle.
 
-## Protocol Endpoints (OIDC)
-- /.well-known/openid-configuration
-- /auth/realms/{realm}/protocol/openid-connect/authorize
-- /auth/realms/{realm}/protocol/openid-connect/token
-- /auth/realms/{realm}/protocol/openid-connect/userinfo
-- /auth/realms/{realm}/protocol/openid-connect/certs
-- /auth/realms/{realm}/protocol/openid-connect/logout
-- /auth/realms/{realm}/protocol/openid-connect/token/introspect
+### Frontend Stack
+- React 18 with Vite for both web apps.
+- Admin UI uses PatternFly styling and component baseline.
+- Account UI is a simpler React surface with inline state management and no shared design system parity yet.
 
-## SPIs
-- UserStorageProvider, Authenticator, IdentityProvider, CredentialProvider, EventListener, PolicyProvider.
+### Current Dev Topology
+- Backend default port: `7070`.
+- Admin UI dev server: `5000`, proxying `/admin` to backend.
+- Account UI dev server: `5100`, proxying `/admin` and `/auth` to backend.
+- Root Express server defaults to `3000` if run separately, but is not required for the main auth flow.
 
-## Data Model (overview)
-- Realm(id, name, keys, settings)
-- Client(id, realm_id, client_id, secret, protocol, redirect_uris)
-- User(id, realm_id, username, email, enabled, attributes)
-- Credential(id, user_id, type, value_hash, salt, created_at)
-- Role(id, realm_id, name, is_client_role, client_id_nullable)
-- Groups, Mappings (user_role, group_role, user_group)
-- Sessions (user_session, client_session)
-- Events (login_event)
+## Current Protocol and API Truth
 
-## Non-Functional
-- Security: OWASP ASVS L2+, secure defaults, Argon2id/bcrypt.
-- Performance: low-latency critical paths; cache hot paths.
-- Availability: stateless token endpoints; horizontal scaling.
-- Observability: OpenTelemetry, Prometheus metrics.
+### Implemented
+- Admin CRUD APIs for realms, users, clients, roles, sessions, and events.
+- Password-based token issuance at `/auth/realms/{realm}/protocol/openid-connect/token`.
+- Logout by session id.
+- Password reset and email verification flows.
+- Health endpoint at `/api/health`.
 
-## Config & Secrets
-- Externalized via env vars; K8s secrets; no secrets in logs.
-- DB migrations via Liquibase.
+### Implemented but Constrained
+- Discovery endpoint exists, but metadata is not yet aligned to a complete OIDC implementation.
+- Userinfo and token introspection endpoints exist, but their validation model is not yet production-grade.
+- JWKS endpoint exists, but does not currently provide a verifiable asymmetric signing model.
 
-## Risks / Mitigations
-- Crypto misuse → vetted libs, reviews.
-- Cache inconsistency → strict TTLs, eventing, cluster testing.
+### Not Implemented
+- Authorization endpoint.
+- Authorization code flow with PKCE.
+- Refresh tokens.
+- SAML support.
+- LDAP/AD federation.
+- Identity brokering.
+- SCIM provisioning.
+
+## Current Technical Constraints
+- Password grant is the only implemented authentication flow.
+- Admin APIs do not yet enforce a true admin authentication/authorization boundary.
+- Token-dependent endpoints need a trustworthy validation path before they can be treated as secure integration surfaces.
+- Client secret handling and TOTP secret storage require Phase 1 hardening.
+- Account UI still relies on manual realm/user identifiers instead of authenticated self-service context.
+- Repository docs historically described a larger platform than the code currently supports; documentation alignment is part of the technical baseline work.
+
+## Data and Persistence Baseline
+- Primary default database target is PostgreSQL.
+- H2 is used for local/test feedback.
+- MySQL, MariaDB, and Oracle are supported through alternate Liquibase change sets and included JDBC drivers.
+- Current persisted model includes realms, clients, users, credentials, roles, role mappings, groups/group mappings, user sessions, client sessions, password reset tokens, email verification tokens, login events, and admin audit events.
+- Groups exist in the schema baseline but are not yet exposed as a current product feature in API/UI docs.
+
+## Non-Functional Baseline
+
+### Implemented
+- Bcrypt password hashing.
+- In-memory rate limiting on the token endpoint.
+- JSON console logging.
+- Configurable session idle timeout.
+- Backend integration tests and frontend production build checks in CI.
+
+### Current Gaps
+- No production-ready admin auth boundary.
+- No production-ready token verification model.
+- No shared session/rate-limit infrastructure for horizontal scaling.
+- No committed production deployment assets.
+- No repository-backed observability stack, staging topology, or operational runbooks.
+
+## Planned Architecture Evolution by Phase
+
+### Phase 1: MVP Hardening and Security Baseline
+- Add admin authentication and authorization.
+- Replace weak token validation behavior with a trustworthy model.
+- Hardening for client secret and TOTP secret handling.
+- Clean up account/admin boundaries and align product docs to implementation.
+
+### Phase 2: OIDC Core Compliance
+- Add authorization code flow with PKCE.
+- Add refresh token model and client grant-type controls.
+- Make discovery and key distribution match the implemented protocol surface.
+
+### Phase 3: Productized Admin and Account Experience
+- Add authenticated account context and proper self-service flows.
+- Improve admin UI workflows around current backend capabilities.
+- Surface audit/event visibility in product UIs.
+
+### Phase 4: Federation and Enterprise Identity
+- Introduce LDAP/AD federation and brokering architecture.
+- Define SAML and external identity integration boundaries.
+
+### Phase 5: Operations, HA, and Production Readiness
+- Externalize shared state as required for scaling.
+- Add deployment assets, observability, runbooks, and release gates.
+
+## Future Capability Building Blocks from the Master Catalog
+
+### Phase 2 Building Blocks
+- Browser login and authorization flow architecture.
+- Refresh token and revocation state model.
+- Consent and scope management support where required by supported OIDC flows.
+- Stronger signing, verification, and key distribution model.
+
+### Phase 3 Building Blocks
+- Authenticated account session context for self-service UX.
+- Richer admin workflow composition and UI-facing service boundaries.
+- Audit/event query surfaces suitable for operational UI views.
+- Notification and email infrastructure maturity for user-facing lifecycle flows.
+
+### Phase 4 Building Blocks
+- Federation and brokering modules.
+- Provisioning connectors and sync metadata handling.
+- Organization/tenant policy model.
+- Future authorization/policy service extensions.
+
+### Phase 5 Building Blocks
+- Shared-state architecture for sessions and rate limiting.
+- Observability, operational telemetry, and release infrastructure.
+- Deployment and runtime architecture suitable for production operations.
+
+## Future Architecture Targets
+- Shared state for sessions and rate limiting.
+- Production deployment topology for backend, UIs, database, ingress, and observability.
+- Federation/provider extension model.
+- Stronger token signing and verification model suitable for external integrations.
+
+## Non-Functional Risks
+- Security work is foundational, not optional; later protocol and UI work depends on it.
+- Protocol documentation and implementation have to stay coupled, or integration risk rises quickly.
+- Multi-database support increases testing burden and migration complexity across later phases.

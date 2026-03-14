@@ -3,10 +3,12 @@ package com.openidentity.auth;
 import com.openidentity.domain.CredentialEntity;
 import com.openidentity.domain.RealmEntity;
 import com.openidentity.domain.UserEntity;
+import com.openidentity.domain.UserRoleEntity;
 import com.openidentity.domain.ClientEntity;
 import com.openidentity.domain.UserSessionEntity;
 import com.openidentity.service.MfaTotpService;
 import com.openidentity.service.EventService;
+import com.openidentity.service.SecretProtectionService;
 import com.openidentity.service.SessionService;
 import io.smallrye.jwt.build.Jwt;
 import org.eclipse.microprofile.config.ConfigProvider;
@@ -24,6 +26,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import org.mindrot.jbcrypt.BCrypt;
 
 @Path("/auth/realms/{realm}/protocol/openid-connect/token")
@@ -36,6 +39,7 @@ public class AuthTokenResource {
   @Inject SessionService sessionService;
   @Inject MfaTotpService mfaTotpService;
   @Inject EventService eventService;
+  @Inject SecretProtectionService secretProtectionService;
 
   public static class TokenResponse {
     public String access_token;
@@ -88,10 +92,17 @@ public class AuthTokenResource {
         .setMaxResults(1)
         .getResultStream().findFirst();
     if (totpSecretOpt.isPresent()) {
-      if (totp == null || !mfaTotpService.verify(totpSecretOpt.get().getValueHash(), totp)) {
+      String storedSecret = secretProtectionService.revealTotpSecret(totpSecretOpt.get().getValueHash());
+      if (totp == null || !mfaTotpService.verify(storedSecret, totp)) {
         throw new WebApplicationException("invalid_grant", Response.Status.UNAUTHORIZED);
       }
     }
+    List<String> roleNames = em.createQuery(
+            "select r.name from RoleEntity r, UserRoleEntity ur where ur.user = :uid and ur.role = r.id",
+            String.class)
+        .setParameter("uid", user.getId())
+        .getResultList();
+    boolean isAdmin = roleNames.stream().anyMatch("admin"::equalsIgnoreCase);
     Instant now = Instant.now();
     long expiresIn = 900; // 15 minutes
     // Create session records first
@@ -103,21 +114,27 @@ public class AuthTokenResource {
     if (clientEntity != null) {
       sessionService.attachClientSession(us, clientEntity);
     }
-    var accessBuilder = Jwt.issuer(System.getenv().getOrDefault("JWT_ISSUER", "http://localhost:7070"))
+    String tokenIssuer = ConfigProvider.getConfig().getOptionalValue("mp.jwt.verify.issuer", String.class)
+        .orElse("http://localhost:7070");
+    var accessBuilder = Jwt.issuer(tokenIssuer)
         .subject(user.getId().toString())
         .upn(user.getUsername())
         .claim("realm", realm.getName())
         .claim("realmId", realm.getId().toString())
         .claim("clientId", clientId)
         .claim("sid", us.getId().toString())
+        .claim("roles", roleNames)
+        .claim("admin", isAdmin)
         .issuedAt(now)
         .expiresIn(Duration.ofSeconds(expiresIn));
-    var idBuilder = Jwt.issuer(System.getenv().getOrDefault("JWT_ISSUER", "http://localhost:7070"))
+    var idBuilder = Jwt.issuer(tokenIssuer)
         .subject(user.getId().toString())
         .upn(user.getUsername())
         .claim("email", user.getEmail())
         .claim("email_verified", user.getEmailVerified())
         .claim("sid", us.getId().toString())
+        .claim("roles", roleNames)
+        .claim("admin", isAdmin)
         .issuedAt(now)
         .expiresIn(Duration.ofSeconds(expiresIn));
     String alg = ConfigProvider.getConfig().getOptionalValue("smallrye.jwt.sign.key.algorithm", String.class).orElse("HS256");

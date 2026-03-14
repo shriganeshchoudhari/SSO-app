@@ -1,3 +1,4 @@
+F:\SSO-app\auth-server\src\main\java\com\openidentity\account\AccountResource.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\AdminClientsResource.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\AdminEventsResource.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\AdminRealmsResource.java
@@ -32,11 +33,15 @@ F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\UserEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\UserRoleEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\UserRoleId.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\UserSessionEntity.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\filters\AdminAuthFilter.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\filters\TokenRateLimitFilter.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\jobs\SessionCleanupJob.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\security\TokenValidationService.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\security\VerifiedToken.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\ConsoleEmailService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\EmailService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\EventService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\MfaTotpService.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\service\SecretProtectionService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\SecurityTokenService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\SessionService.java

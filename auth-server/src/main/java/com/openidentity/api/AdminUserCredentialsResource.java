@@ -3,6 +3,7 @@ package com.openidentity.api;
 import com.openidentity.domain.CredentialEntity;
 import com.openidentity.domain.UserEntity;
 import com.openidentity.service.MfaTotpService;
+import com.openidentity.service.SecretProtectionService;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import jakarta.inject.Inject;
@@ -33,6 +34,7 @@ public class AdminUserCredentialsResource {
 
   @Inject EntityManager em;
   @Inject MfaTotpService mfaTotpService;
+  @Inject SecretProtectionService secretProtectionService;
 
   @POST
   @Path("/password")
@@ -75,7 +77,7 @@ public class AdminUserCredentialsResource {
     cred.setId(UUID.randomUUID());
     cred.setUser(u);
     cred.setType("totp");
-    cred.setValueHash(secret);
+    cred.setValueHash(secretProtectionService.protectTotpSecret(secret));
     cred.setCreatedAt(OffsetDateTime.now());
     em.persist(cred);
 

@@ -8,6 +8,7 @@ type Role = { id: string; realmId: string; name: string; clientId?: string }
 type Session = { id: string; userId: string; started: string; lastRefresh: string }
 
 export default function App() {
+  const [accessToken, setAccessToken] = useState('')
   const [realms, setRealms] = useState<Realm[]>([])
   const [realmName, setRealmName] = useState('')
   const [realmDisplayName, setRealmDisplayName] = useState('')
@@ -33,8 +34,17 @@ export default function App() {
 
   const selectedRealm = useMemo(() => realms.find(r => r.id === selectedRealmId) || null, [realms, selectedRealmId])
 
+  const authHeaders = (json = false) => ({
+    Authorization: `Bearer ${accessToken.trim()}`,
+    ...(json ? { 'Content-Type': 'application/json' } : {})
+  })
+
   const loadRealms = async () => {
-    const res = await fetch('/admin/realms')
+    const res = await fetch('/admin/realms', { headers: authHeaders() })
+    if (!res.ok) {
+      setRealms([])
+      return
+    }
     const data = await res.json()
     setRealms(data)
     if (!selectedRealmId && data.length > 0) {
@@ -43,38 +53,66 @@ export default function App() {
   }
 
   const loadUsers = async (realmId: string) => {
-    const res = await fetch(`/admin/realms/${realmId}/users`)
+    const res = await fetch(`/admin/realms/${realmId}/users`, { headers: authHeaders() })
+    if (!res.ok) {
+      setUsers([])
+      return
+    }
     const data = await res.json()
     setUsers(data)
   }
 
   const loadClients = async (realmId: string) => {
-    const res = await fetch(`/admin/realms/${realmId}/clients`)
+    const res = await fetch(`/admin/realms/${realmId}/clients`, { headers: authHeaders() })
+    if (!res.ok) {
+      setClients([])
+      return
+    }
     const data = await res.json()
     setClients(data)
   }
 
   const loadRoles = async (realmId: string) => {
-    const res = await fetch(`/admin/realms/${realmId}/roles`)
+    const res = await fetch(`/admin/realms/${realmId}/roles`, { headers: authHeaders() })
+    if (!res.ok) {
+      setRoles([])
+      return
+    }
     const data = await res.json()
     setRoles(data)
   }
 
   const loadSessions = async (realmId: string) => {
-    const res = await fetch(`/admin/realms/${realmId}/sessions`)
+    const res = await fetch(`/admin/realms/${realmId}/sessions`, { headers: authHeaders() })
+    if (!res.ok) {
+      setSessions([])
+      return
+    }
     const data = await res.json()
     setSessions(data)
   }
 
   const deleteSession = async (sessionId: string) => {
     if (!selectedRealmId) return
-    await fetch(`/admin/realms/${selectedRealmId}/sessions/${sessionId}`, { method: 'DELETE' })
+    await fetch(`/admin/realms/${selectedRealmId}/sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    })
     await loadSessions(selectedRealmId)
   }
 
   useEffect(() => {
-    loadRealms()
-  }, [])
+    if (accessToken.trim()) {
+      loadRealms()
+    } else {
+      setRealms([])
+      setSelectedRealmId(null)
+      setUsers([])
+      setClients([])
+      setRoles([])
+      setSessions([])
+    }
+  }, [accessToken])
 
   useEffect(() => {
     if (selectedRealmId) {
@@ -95,7 +133,7 @@ export default function App() {
     setCreatingRealm(true)
     await fetch('/admin/realms', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(true),
       body: JSON.stringify({ name: realmName, displayName: realmDisplayName })
     })
     setRealmName('')
@@ -110,7 +148,7 @@ export default function App() {
     setCreatingUser(true)
     await fetch(`/admin/realms/${selectedRealmId}/users`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(true),
       body: JSON.stringify({ username: userUsername, email: userEmail, enabled: true })
     })
     setUserUsername('')
@@ -125,7 +163,7 @@ export default function App() {
     if (!pwd) return
     await fetch(`/admin/realms/${selectedRealmId}/users/${userId}/credentials/password`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(true),
       body: JSON.stringify({ password: pwd })
     })
     setPasswordInputs(prev => ({ ...prev, [userId]: '' }))
@@ -137,7 +175,7 @@ export default function App() {
     setCreatingClient(true)
     await fetch(`/admin/realms/${selectedRealmId}/clients`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(true),
       body: JSON.stringify({ clientId: clientIdInput, protocol: clientProtocol, publicClient: clientPublic })
     })
     setClientIdInput('')
@@ -151,7 +189,7 @@ export default function App() {
     setCreatingRole(true)
     await fetch(`/admin/realms/${selectedRealmId}/roles`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(true),
       body: JSON.stringify({ name: roleName })
     })
     setRoleName('')
@@ -162,6 +200,17 @@ export default function App() {
   return (
     <div style={{ padding: 24, fontFamily: 'system-ui, sans-serif' }}>
       <h1>OpenIdentity Admin Console</h1>
+      <p style={{ marginTop: 0 }}>
+        Provide an admin bearer token or the configured bootstrap bearer token to use the admin APIs.
+      </p>
+      <div style={{ marginBottom: 16 }}>
+        <textarea
+          placeholder="Admin access token or bootstrap token"
+          value={accessToken}
+          onChange={e => setAccessToken(e.target.value)}
+          style={{ width: '100%', minHeight: 72 }}
+        />
+      </div>
       <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start' }}>
         <section style={{ flex: 1 }}>
           <h2>Realms</h2>
@@ -178,7 +227,7 @@ export default function App() {
           <ul>
             {realms.map(r => (
               <li key={r.id}>
-                <strong>{r.name}</strong> {r.displayName ? `— ${r.displayName}` : ''} {r.enabled ? '(enabled)' : '(disabled)'}
+                <strong>{r.name}</strong> {r.displayName ? `- ${r.displayName}` : ''} {r.enabled ? '(enabled)' : '(disabled)'}
               </li>
             ))}
           </ul>
@@ -196,7 +245,7 @@ export default function App() {
                 <input value={realmDisplayName} onChange={e => setRealmDisplayName(e.target.value)} />
               </label>
             </div>
-            <button disabled={creatingRealm || !realmName}>Create</button>
+            <button disabled={creatingRealm || !realmName || !accessToken.trim()}>Create</button>
           </form>
         </section>
         <section style={{ flex: 1 }}>
@@ -207,7 +256,7 @@ export default function App() {
                 {users.map(u => (
                   <li key={u.id} style={{ marginBottom: 6 }}>
                     <div>
-                      <strong>{u.username}</strong> {u.email ? `— ${u.email}` : ''} {u.enabled ? '(enabled)' : '(disabled)'}
+                      <strong>{u.username}</strong> {u.email ? `- ${u.email}` : ''} {u.enabled ? '(enabled)' : '(disabled)'}
                     </div>
                     <div style={{ marginTop: 4 }}>
                       <input
@@ -236,7 +285,7 @@ export default function App() {
                     <input type="email" value={userEmail} onChange={e => setUserEmail(e.target.value)} />
                   </label>
                 </div>
-                <button disabled={creatingUser || !userUsername}>Create</button>
+                <button disabled={creatingUser || !userUsername || !accessToken.trim()}>Create</button>
               </form>
             </>
           ) : (
@@ -250,7 +299,7 @@ export default function App() {
               <ul>
                 {clients.map(c => (
                   <li key={c.id}>
-                    <strong>{c.clientId}</strong> — {c.protocol} {c.publicClient ? '(public)' : '(confidential)'}
+                    <strong>{c.clientId}</strong> - {c.protocol} {c.publicClient ? '(public)' : '(confidential)'}
                   </li>
                 ))}
               </ul>
@@ -277,7 +326,7 @@ export default function App() {
                     <input type="checkbox" checked={clientPublic} onChange={e => setClientPublic(e.target.checked)} />
                   </label>
                 </div>
-                <button disabled={creatingClient || !clientIdInput}>Create</button>
+                <button disabled={creatingClient || !clientIdInput || !accessToken.trim()}>Create</button>
               </form>
             </>
           ) : (
@@ -303,7 +352,7 @@ export default function App() {
                     <input value={roleName} onChange={e => setRoleName(e.target.value)} required />
                   </label>
                 </div>
-                <button disabled={creatingRole || !roleName}>Create</button>
+                <button disabled={creatingRole || !roleName || !accessToken.trim()}>Create</button>
               </form>
             </>
           ) : (
@@ -318,7 +367,7 @@ export default function App() {
                 {sessions.map(s => (
                   <li key={s.id} style={{ marginBottom: 6 }}>
                     <div>
-                      <strong>{s.id}</strong> — user {s.userId} — started {new Date(s.started).toLocaleString()}
+                      <strong>{s.id}</strong> - user {s.userId} - started {new Date(s.started).toLocaleString()}
                     </div>
                     <div>last refresh {new Date(s.lastRefresh).toLocaleString()}</div>
                     <button onClick={() => deleteSession(s.id)} style={{ marginTop: 4 }}>Delete</button>
@@ -334,4 +383,3 @@ export default function App() {
     </div>
   )
 }
-

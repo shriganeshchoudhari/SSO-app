@@ -1,46 +1,63 @@
-# Security & Compliance
+# Security and Compliance - OpenIdentity
 
-## Baselines
-- Standards: OAuth 2.0, OIDC, SAML 2.0
-- Controls: OWASP ASVS L2+, OWASP Top 10
-- Crypto: Argon2id/bcrypt for passwords; JWT with RS256/ES256; rotate keys.
+## Document Intent
+This document states the current security baseline that exists in the repository, the major gaps that remain, and the remediation roadmap by phase. It is not a claim of current standards compliance beyond what the code supports today.
 
-## Authentication & Sessions
-- MFA (TOTP) optional; pluggable authenticators.
-- Session TTLs; refresh token reuse detection (when enabled).
-- SameSite cookies (Strict/Lax as appropriate); HttpOnly, Secure.
+## Current Implemented Controls
+- Bcrypt password hashing for stored password credentials.
+- Basic in-memory rate limiting on the token endpoint.
+- TOTP enrollment and verification in the password grant flow.
+- JSON console logging in backend configuration.
+- Configurable session idle timeout.
+- Password reset and email verification tokens are stored as hashes rather than raw reset/verify tokens.
 
-## Transport & Headers
-- Enforce TLS 1.2+; HSTS in production.
-- CSP, X-Content-Type-Options, X-Frame-Options (deny), Referrer-Policy.
+## Current Gaps and Risks
+- Admin authentication and authorization are not yet enforced on admin APIs.
+- Token validation behavior for userinfo and introspection is not yet trustworthy enough for production use.
+- JWKS/signing model is incomplete for production-grade external verification.
+- Client secret handling needs hardening.
+- TOTP secret handling needs hardening.
+- TLS, secure headers, CSP/HSTS, and broader deployment-level controls are not guaranteed by the product as it exists in this repository.
+- Security docs historically overstated compliance posture relative to the implementation.
 
-## Input/Output Safety
-- Centralized validation; canonicalization for burgeoning URIs/domains.
-- Output encoding; CSRF protections on state-changing endpoints.
+## Phase-Based Hardening Roadmap
 
-## Threat Protection
-- Brute force protection: account lock after N failed attempts; unlock policy.
-- Rate limiting: per-IP and per-endpoint thresholds for auth APIs.
-- Bot detection: CAPTCHA or risk scoring on suspicious flows.
-- IP allow/block lists; geo-restriction policies.
-- Compromised password detection via external breach lists.
+### Phase 1: MVP Hardening and Security Baseline
+- Add admin authn/authz.
+- Fix weak token validation behavior.
+- Harden client secret and TOTP secret handling.
+- Align documentation and supported-surface claims with actual implementation.
 
-## Secrets & Config
-- No secrets in code/logs; K8s secrets or vault.
-- JWKS rotation; audit of key lifecycles.
+### Phase 2: OIDC Core Compliance
+- Add a trustworthy verification/signing model appropriate for supported OIDC flows.
+- Add refresh token and client security controls required for usable OIDC behavior.
 
-## Logging & Audit
-- Structured JSON logs; no PII beyond necessity.
-- Audit events: login/logout/error/admin actions.
+### Phase 3: Productized Admin and Account Experience
+- Improve UX guardrails and safer user-facing/authenticated security workflows.
 
-## Data Protection
-- Minimal retention; GDPR/consent readiness.
-- Right-to-erasure/user export plan.
+### Phase 4: Federation and Enterprise Identity
+- Add security model extensions for federation and external identity integrations.
 
-## Checklist (MVP)
-- [ ] ASVS auth/session controls implemented
-- [ ] Secure defaults; admin password bootstrap policy
-- [ ] Pen test and SAST/DAST pipelines
-- [ ] Brute force/rate limit controls
-- [ ] TLS/HSTS, CSP, and secure headers
-- [ ] JWT key rotation and JWKS exposure
+### Phase 5: Operations, HA, and Production Readiness
+- Add production operational controls, observability, deployment hardening, and runbook support.
+
+## Future Security and Compliance Coverage from the Master Catalog
+
+### Phase 1-2 Security Domains
+- Brute-force and bot-detection controls.
+- Stronger crypto, signing, key management, and secret rotation.
+- Better session and token revocation controls.
+
+### Phase 3-4 Security Domains
+- Richer consent and privacy behavior where product features require it.
+- Policy-driven MFA and account-protection controls.
+- Federation-oriented trust and mapping controls.
+
+### Phase 5 Compliance Domains
+- GDPR/CCPA/SOC2/HIPAA readiness work as future posture goals.
+- Audit/export/privacy controls where supported by product and operations maturity.
+
+## Compliance Posture Statement
+- OpenIdentity is not yet ready to claim OWASP ASVS L2 alignment.
+- OpenIdentity is not yet ready to claim production-grade OIDC or SAML compliance.
+- Security hardening is primarily a Phase 1 and Phase 2 effort, and later phases should build on those results rather than bypass them.

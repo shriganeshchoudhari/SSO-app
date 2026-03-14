@@ -1,3 +1,27 @@
+# Git ignore file for SSO-app
+# Ignore .git folder
+.git/
+# Ignore .gitignore file
+.gitignore
+# Ignore .DS_Store file
+.DS_Store
+# Ignore .idea folder
+.idea/  
+# Ignore .gitmodules file
+.gitmodules 
+# Java specific ignores
+*.class
+*.jar
+*.war
+auth-server/target/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+hs_err_pid*
+replay_pid*
+
 # Ignore node_modules folder
 node_modules/
 # Ignore .env file
@@ -9,3 +33,6 @@ node_modules/
 .idea/
 .vscode/
 *.pyc
+# Ignore build and dist folders
+build/
+dist/

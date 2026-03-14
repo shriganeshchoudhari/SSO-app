@@ -1,125 +1,115 @@
-# Database Schema (PostgreSQL) — Initial
+# Database Schema - OpenIdentity
 
-## Entities & Relations (high level)
-- Realm 1—* Client, User, Role, Group
-- User *—* Role (user_role), Group *—* Role (group_role), User *—* Group (user_group)
-- Client may define client-specific roles
-- Sessions and Events link to Realm/User/Client
+## Document Intent
+This document describes the current persisted model and migration status in the repository. Liquibase changelogs under `auth-server/src/main/resources/db/changelog` are the schema source of truth.
 
-## Compatibility Notes (Multi-DB)
-- Primary target: PostgreSQL (full schema).
-- Additional targets: H2/MySQL/MariaDB/Oracle with core tables (realm, iam_user) for now.
-- Postgres-specific types (e.g., INET, JSONB, TEXT[]) appear in sessions/events/clients. These will be normalized or adapted per-DB in later migrations.
-- Migrations are selected per database via Liquibase dbms-specific changeSets.
-  - H2: UUID native; timestamps use CURRENT_TIMESTAMP; booleans supported.
-  - MySQL/MariaDB: use CHAR(36) for UUIDs, DATETIME for timestamps, TINYINT(1) for booleans.
-  - Oracle: use CHAR(36) for UUIDs, TIMESTAMP for timestamps, NUMBER(1) for booleans.
+## Current Entities and Tables
 
-## Tables (DDL v0)
--- realm
-CREATE TABLE realm (
-  id UUID PRIMARY KEY,
-  name TEXT UNIQUE NOT NULL,
-  display_name TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  enabled BOOLEAN DEFAULT TRUE
-);
+### Core Identity
+- `realm`
+- `client`
+- `iam_user`
+- `credential`
+- `role`
+- `user_role`
 
--- client
-CREATE TABLE client (
-  id UUID PRIMARY KEY,
-  realm_id UUID REFERENCES realm(id) ON DELETE CASCADE,
-  client_id TEXT NOT NULL,
-  protocol TEXT NOT NULL,          -- 'openid-connect' or 'saml'
-  secret TEXT,                     -- store hashed/enc
-  redirect_uris TEXT[],            -- normalized
-  public_client BOOLEAN DEFAULT FALSE,
-  UNIQUE(realm_id, client_id)
-);
+### Grouping Baseline
+- `group`
+- `user_group`
+- `group_role`
 
--- "user"
-CREATE TABLE iam_user (
-  id UUID PRIMARY KEY,
-  realm_id UUID REFERENCES realm(id) ON DELETE CASCADE,
-  username TEXT NOT NULL,
-  email TEXT,
-  enabled BOOLEAN DEFAULT TRUE,
-  email_verified BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(realm_id, username)
-);
+### Sessions
+- `user_session`
+- `client_session`
 
--- credential
-CREATE TABLE credential (
-  id UUID PRIMARY KEY,
-  user_id UUID REFERENCES iam_user(id) ON DELETE CASCADE,
-  type TEXT NOT NULL,              -- password, totp, webauthn
-  value_hash TEXT NOT NULL,
-  salt BYTEA,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+### Recovery and Verification
+- `password_reset_token`
+- `email_verification_token`
 
--- role
-CREATE TABLE role (
-  id UUID PRIMARY KEY,
-  realm_id UUID REFERENCES realm(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  client_id UUID NULL REFERENCES client(id) ON DELETE CASCADE,
-  UNIQUE(realm_id, name, client_id)
-);
+### Events and Audit
+- `login_event`
+- `admin_audit_event`
 
--- mappings
-CREATE TABLE user_role (
-  user_id UUID REFERENCES iam_user(id) ON DELETE CASCADE,
-  role_id UUID REFERENCES role(id) ON DELETE CASCADE,
-  PRIMARY KEY(user_id, role_id)
-);
+## Current Relationships
+- A realm owns clients, users, roles, groups, sessions, and events.
+- A user belongs to a realm and can have multiple credentials.
+- Roles belong to a realm and may optionally reference a client.
+- User-role mappings are stored through `user_role`.
+- Group-related tables exist in the schema baseline, but groups are not yet a current product surface in API/UI docs.
+- A user session belongs to a realm and a user.
+- A client session belongs to a user session and a client.
+- Password reset and email verification tokens belong to a realm and a user.
+- Login and admin audit events are realm-scoped with optional user/client references.
 
-CREATE TABLE "group" (
-  id UUID PRIMARY KEY,
-  realm_id UUID REFERENCES realm(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  parent_id UUID NULL REFERENCES "group"(id) ON DELETE SET NULL,
-  UNIQUE(realm_id, name, parent_id)
-);
+## Current Schema Notes
 
-CREATE TABLE user_group (
-  user_id UUID REFERENCES iam_user(id) ON DELETE CASCADE,
-  group_id UUID REFERENCES "group"(id) ON DELETE CASCADE,
-  PRIMARY KEY(user_id, group_id)
-);
+### Client Model
+- `client.secret` exists today.
+- `client.redirect_uris` exists in the PostgreSQL baseline schema, but redirect URI management is not yet a current product feature in the API/UI surface.
+- `public_client` exists and is currently exposed by the admin API.
 
-CREATE TABLE group_role (
-  group_id UUID REFERENCES "group"(id) ON DELETE CASCADE,
-  role_id UUID REFERENCES role(id) ON DELETE CASCADE,
-  PRIMARY KEY(group_id, role_id)
-);
+### Credential Model
+- Password credentials are stored in `credential` with bcrypt hashes.
+- TOTP credentials currently use the same credential table and require Phase 1 hardening because the stored secret protection model is weaker than desired.
 
--- sessions
-CREATE TABLE user_session (
-  id UUID PRIMARY KEY,
-  realm_id UUID REFERENCES realm(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES iam_user(id) ON DELETE CASCADE,
-  started TIMESTAMPTZ NOT NULL,
-  last_refresh TIMESTAMPTZ NOT NULL,
-  ip_address INET
-);
+### Session Model
+- `user_session` stores `started`, `last_refresh`, and `ip_address`.
+- `client_session` links user sessions to clients and includes `scope`.
+- Session expiry cleanup exists at the application level, but shared HA session state does not.
 
-CREATE TABLE client_session (
-  id UUID PRIMARY KEY,
-  user_session_id UUID REFERENCES user_session(id) ON DELETE CASCADE,
-  client_id UUID REFERENCES client(id) ON DELETE CASCADE,
-  scope TEXT[]
-);
+### Recovery Token Model
+- Password reset and email verification tokens are stored as SHA-256 token hashes with expiry and usage timestamps.
 
--- events
-CREATE TABLE login_event (
-  id BIGSERIAL PRIMARY KEY,
-  realm_id UUID REFERENCES realm(id) ON DELETE CASCADE,
-  user_id UUID NULL REFERENCES iam_user(id) ON DELETE SET NULL,
-  client_id UUID NULL REFERENCES client(id) ON DELETE SET NULL,
-  type TEXT NOT NULL,       -- LOGIN, LOGOUT, ERROR
-  time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  ip_address INET,
-  details JSONB
-);
+## Multi-DB Support
+- Default runtime target is PostgreSQL.
+- H2, MySQL, MariaDB, and Oracle have DB-specific Liquibase SQL files.
+- Current migration set is organized into:
+  - `0001` initial schema
+  - `0002` security tokens
+  - `0003` audit/events
+
+## Known Schema Gaps
+- Schema contains some baseline structures that are not yet represented as current product features in API/UI docs, especially around groups and redirect URI management.
+- Client secret handling needs Phase 1 hardening.
+- TOTP secret storage needs Phase 1 hardening.
+- Current schema alone does not imply a production-ready verification or revocation model for tokens.
+
+## Planned Schema Evolution by Phase
+
+### Phase 1: MVP Hardening and Security Baseline
+- Harden stored secrets and sensitive credential handling.
+- Align schema usage with the current supported product surface.
+
+### Phase 2: OIDC Core Compliance
+- Extend persisted client and token state only as required for auth code flow, PKCE, refresh tokens, and revocation behavior.
+
+### Phase 3: Productized Admin and Account Experience
+- Add schema changes only when needed to support authenticated UI workflows or richer audit visibility.
+
+### Phase 4: Federation and Enterprise Identity
+- Add federation and external identity persistence only when those features are implemented.
+
+### Phase 5: Operations, HA, and Production Readiness
+- Add shared-state persistence only when required by scaling and deployment architecture.
+
+## Future Schema Capability Domains from the Master Catalog
+
+### Phase 2 Domains
+- Refresh token and revocation state.
+- Consent and scope persistence where required by supported OIDC flows.
+- Stronger client configuration state for redirect URIs, grant types, and token policies.
+
+### Phase 3 Domains
+- Expanded self-service and account session metadata where required by productized account UX.
+- Richer audit/event query support if UI and operational workflows require additional persisted views.
+
+### Phase 4 Domains
+- Organization/tenant data.
+- Policy/permission models.
+- Federation and broker mappings.
+- Provisioning and sync metadata.
+
+### Phase 5 Domains
+- Notification/email template records if operationalized in-product.
+- Compliance/export/delete support records where needed for future privacy features.
+- Shared-state persistence only if required by final production architecture.

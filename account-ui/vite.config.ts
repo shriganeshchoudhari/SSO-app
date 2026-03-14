@@ -13,6 +13,10 @@ export default defineConfig({
       '/auth': {
         target: 'http://localhost:7070',
         changeOrigin: true
+      },
+      '/account': {
+        target: 'http://localhost:7070',
+        changeOrigin: true
       }
     }
   }

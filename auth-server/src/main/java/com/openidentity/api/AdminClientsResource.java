@@ -5,6 +5,7 @@ import com.openidentity.api.dto.ClientDtos.UpdateClientRequest;
 import com.openidentity.api.dto.ClientDtos.ClientResponse;
 import com.openidentity.domain.ClientEntity;
 import com.openidentity.domain.RealmEntity;
+import com.openidentity.service.SecretProtectionService;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AdminClientsResource {
   @Inject EntityManager em;
+  @Inject SecretProtectionService secretProtectionService;
 
   @GET
   public List<ClientResponse> list(@PathParam("realmId") UUID realmId,
@@ -60,7 +62,7 @@ public class AdminClientsResource {
     c.setRealm(realm);
     c.setClientId(req.clientId);
     c.setProtocol(req.protocol);
-    c.setSecret(req.secret);
+    c.setSecret(secretProtectionService.hashClientSecret(req.secret));
     c.setPublicClient(req.publicClient != null ? req.publicClient : Boolean.FALSE);
     em.persist(c);
     return Response.created(URI.create(String.format("/admin/realms/%s/clients/%s", realmId, c.getId())))
@@ -74,7 +76,7 @@ public class AdminClientsResource {
   public Response update(@PathParam("realmId") UUID realmId, @PathParam("clientId") UUID id, UpdateClientRequest req) {
     ClientEntity c = em.find(ClientEntity.class, id);
     if (c == null || !c.getRealm().getId().equals(realmId)) throw new NotFoundException();
-    if (req.secret != null) c.setSecret(req.secret);
+    if (req.secret != null) c.setSecret(secretProtectionService.hashClientSecret(req.secret));
     if (req.publicClient != null) c.setPublicClient(req.publicClient);
     return Response.noContent().build();
   }
@@ -89,4 +91,3 @@ public class AdminClientsResource {
     return Response.noContent().build();
   }
 }
-
