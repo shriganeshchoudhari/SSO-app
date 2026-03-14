@@ -72,6 +72,11 @@ public class ClientRoleFlowTest {
         .then().statusCode(anyOf(is(200), is(204)));
 
     adminRequest()
+        .when().get("/admin/realms/" + realmId + "/users/" + userId + "/roles")
+        .then().statusCode(200)
+        .body("name", hasItem("admin"));
+
+    adminRequest()
         .when().delete("/admin/realms/" + realmId + "/users/" + userId + "/roles/" + roleId)
         .then().statusCode(anyOf(is(200), is(204)));
 

@@ -111,7 +111,9 @@ public class AuthFlowTest {
         .then().statusCode(200)
         .extract().jsonPath().getString("access_token");
 
-    String tampered = accessToken.substring(0, accessToken.length() - 1) + "x";
+    String[] parts = accessToken.split("\\.");
+    String tamperedSignature = (parts[2].charAt(0) == 'a' ? "b" : "a") + parts[2].substring(1);
+    String tampered = parts[0] + "." + parts[1] + "." + tamperedSignature;
 
     given()
         .header("Authorization", "Bearer " + tampered)

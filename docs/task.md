@@ -52,10 +52,10 @@ This file tracks delivery status for the current product baseline and the phased
 | --- | --- | --- | --- |
 | Admin UI for current CRUD baseline | Complete | Minimal operational UI exists today | - |
 | Transitional account UI | Complete | Profile/password/TOTP/sessions surface exists | - |
-| Authenticated account portal | In Progress | Account UI now uses bearer-token self-service APIs, but still needs full login/session UX | Phase 1-2 |
-| Account self-service semantics | In Progress | Dedicated `/account` APIs exist; broader UX/productization remains Phase 3 work | Phase 1-2 |
-| Improved admin workflows | Not Started | Current UI is functional but minimal | Phase 1-2 |
-| Audit/event visibility in UI | Not Started | Backend event APIs exist; no UI surface yet | Phase 1-2 |
+| Authenticated account portal | Complete | Account UI now supports sign-in, refresh, and self-service account context without pasted IDs | Phase 1-2 |
+| Account self-service semantics | Complete | Profile, password, TOTP, and session actions now run through dedicated `/account` APIs | Phase 1-2 |
+| Improved admin workflows | Complete | Admin UI now supports user update/delete, role assignment/removal, client and role deletion, client-scoped role creation, safer session deletion, and clearer feedback | Phase 1-2 |
+| Audit/event visibility in UI | Complete | Admin UI now surfaces recent login and admin audit events for the selected realm | Phase 1-2 |
 
 ## Phase 4: Federation and Enterprise Identity
 
@@ -84,12 +84,12 @@ This file tracks delivery status for the current product baseline and the phased
 | --- | --- | --- | --- |
 | Auth flows and token lifecycle | In Progress | Password, auth code, PKCE, refresh, revoke, RS256 signing, and JWKS now exist; key lifecycle hardening still remains | Phase 2 |
 | MFA and recovery maturity | In Progress | Baseline TOTP and recovery flows exist; policy and factor expansion remain | Phase 2-3 |
-| User/profile lifecycle maturity | Planned | Covers richer self-service, lifecycle, and account experience work | Phase 3 |
+| User/profile lifecycle maturity | In Progress | Account portal sign-in and core self-service flows now exist; broader lifecycle UX still remains | Phase 3 |
 | Org/tenant and branding | Not Started | Covers organization model, delegated admin, branding, and localization | Phase 4-5 |
 | RBAC/ABAC/consent | Not Started | Covers richer authorization and consent domains | Phase 4 |
 | Provisioning and federation | Not Started | Covers LDAP/AD, brokering, SCIM, and sync | Phase 4 |
 | Developer APIs, SDKs, and webhooks | Not Started | Covers config-as-code, SDKs, event delivery, and expanded platform APIs | Phase 4-5 |
-| Audit, monitoring, and compliance | Planned | Covers richer audit visibility now and compliance posture later | Phase 3-5 |
+| Audit, monitoring, and compliance | In Progress | Admin UI now surfaces audit/login events; broader monitoring and compliance work still remains | Phase 3-5 |
 | Deployment and infrastructure maturity | Not Started | Covers containerization, observability, HA state, and runbooks | Phase 5 |
 
 ## Documentation Alignment

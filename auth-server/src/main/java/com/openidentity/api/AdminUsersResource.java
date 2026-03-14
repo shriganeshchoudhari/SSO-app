@@ -3,7 +3,9 @@ package com.openidentity.api;
 import com.openidentity.api.dto.UserDtos.CreateUserRequest;
 import com.openidentity.api.dto.UserDtos.UpdateUserRequest;
 import com.openidentity.api.dto.UserDtos.UserResponse;
+import com.openidentity.api.dto.RoleDtos.RoleResponse;
 import com.openidentity.domain.RealmEntity;
+import com.openidentity.domain.RoleEntity;
 import com.openidentity.domain.UserEntity;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
@@ -52,6 +54,24 @@ public class AdminUsersResource {
       throw new NotFoundException("User not found");
     }
     return new UserResponse(u.getId(), u.getRealm().getId(), u.getUsername(), u.getEmail(), u.getEnabled(), u.getEmailVerified());
+  }
+
+  @GET
+  @Path("/{userId}/roles")
+  @Operation(summary = "List roles assigned to user")
+  public List<RoleResponse> listRoles(@PathParam("realmId") UUID realmId, @PathParam("userId") UUID userId) {
+    UserEntity u = em.find(UserEntity.class, userId);
+    if (u == null || !u.getRealm().getId().equals(realmId)) {
+      throw new NotFoundException("User not found");
+    }
+    return em.createQuery(
+            "select r from RoleEntity r, UserRoleEntity ur where ur.user = :uid and ur.role = r.id and r.realm.id = :rid order by r.name",
+            RoleEntity.class)
+        .setParameter("uid", userId)
+        .setParameter("rid", realmId)
+        .getResultList().stream()
+        .map(r -> new RoleResponse(r.getId(), r.getRealm().getId(), r.getName(), r.getClient() != null ? r.getClient().getId() : null))
+        .collect(Collectors.toList());
   }
 
   @POST
