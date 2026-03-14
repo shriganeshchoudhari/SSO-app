@@ -35,7 +35,14 @@ public class AdminClientsResource {
     q.setFirstResult(first);
     q.setMaxResults(max);
     return q.getResultList().stream()
-        .map(c -> new ClientResponse(c.getId(), c.getRealm().getId(), c.getClientId(), c.getProtocol(), c.getPublicClient()))
+        .map(c -> new ClientResponse(
+            c.getId(),
+            c.getRealm().getId(),
+            c.getClientId(),
+            c.getProtocol(),
+            c.getPublicClient(),
+            c.getRedirectUris(),
+            List.copyOf(c.getGrantTypes())))
         .collect(Collectors.toList());
   }
 
@@ -46,7 +53,14 @@ public class AdminClientsResource {
     if (c == null || !c.getRealm().getId().equals(realmId)) {
       throw new NotFoundException();
     }
-    return new ClientResponse(c.getId(), c.getRealm().getId(), c.getClientId(), c.getProtocol(), c.getPublicClient());
+    return new ClientResponse(
+        c.getId(),
+        c.getRealm().getId(),
+        c.getClientId(),
+        c.getProtocol(),
+        c.getPublicClient(),
+        c.getRedirectUris(),
+        List.copyOf(c.getGrantTypes()));
   }
 
   @POST
@@ -64,9 +78,18 @@ public class AdminClientsResource {
     c.setProtocol(req.protocol);
     c.setSecret(secretProtectionService.hashClientSecret(req.secret));
     c.setPublicClient(req.publicClient != null ? req.publicClient : Boolean.FALSE);
+    c.setRedirectUris(req.redirectUris);
+    c.setGrantTypes(req.grantTypes);
     em.persist(c);
     return Response.created(URI.create(String.format("/admin/realms/%s/clients/%s", realmId, c.getId())))
-        .entity(new ClientResponse(c.getId(), realmId, c.getClientId(), c.getProtocol(), c.getPublicClient()))
+        .entity(new ClientResponse(
+            c.getId(),
+            realmId,
+            c.getClientId(),
+            c.getProtocol(),
+            c.getPublicClient(),
+            c.getRedirectUris(),
+            List.copyOf(c.getGrantTypes())))
         .build();
   }
 
@@ -78,6 +101,8 @@ public class AdminClientsResource {
     if (c == null || !c.getRealm().getId().equals(realmId)) throw new NotFoundException();
     if (req.secret != null) c.setSecret(secretProtectionService.hashClientSecret(req.secret));
     if (req.publicClient != null) c.setPublicClient(req.publicClient);
+    if (req.redirectUris != null) c.setRedirectUris(req.redirectUris);
+    if (req.grantTypes != null) c.setGrantTypes(req.grantTypes);
     return Response.noContent().build();
   }
 

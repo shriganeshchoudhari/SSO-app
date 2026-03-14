@@ -3,6 +3,7 @@ package com.openidentity.security;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openidentity.domain.UserSessionEntity;
+import com.openidentity.service.JwtKeyService;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -10,6 +11,7 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.Signature;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -26,6 +28,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 public class TokenValidationService {
   @Inject EntityManager em;
   @Inject ObjectMapper objectMapper;
+  @Inject JwtKeyService jwtKeyService;
 
   @ConfigProperty(name = "smallrye.jwt.sign.key")
   Optional<String> signKey;
@@ -95,6 +98,16 @@ public class TokenValidationService {
 
   private void verifySignature(String headerPart, String payloadPart, String signaturePart, Map<String, Object> header) throws Exception {
     String alg = stringClaim(header.get("alg"));
+    if ("RS256".equals(alg)) {
+      Signature signature = Signature.getInstance("SHA256withRSA");
+      signature.initVerify(jwtKeyService.getPublicKey());
+      signature.update((headerPart + "." + payloadPart).getBytes(StandardCharsets.UTF_8));
+      byte[] provided = Base64.getUrlDecoder().decode(signaturePart);
+      if (!signature.verify(provided)) {
+        throw unauthorized("invalid_signature");
+      }
+      return;
+    }
     if (!"HS256".equals(alg) || !"HS256".equalsIgnoreCase(signAlgorithm)) {
       throw unauthorized("unsupported_token_alg");
     }

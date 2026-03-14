@@ -28,23 +28,23 @@ This file tracks delivery status for the current product baseline and the phased
 | Basic token endpoint rate limiting | Complete | In-memory rate limiter exists | - |
 | Backend integration tests | Complete | Auth, client/role, OpenAPI, and recovery tests exist | - |
 | Frontend production builds in CI | Complete | Admin and account UI builds run in CI | - |
-| Admin authentication and authorization | Planned | Required hardening not implemented yet | Existing admin APIs |
-| Trustworthy token validation for userinfo/introspection | Planned | Current behavior needs Phase 1 hardening | Existing protocol endpoints |
-| Client secret hardening | Planned | Current storage model needs improvement | Existing client persistence |
-| TOTP secret hardening | Planned | Current storage model needs improvement | Existing credential model |
-| Account/admin boundary cleanup | Planned | Account UI still depends on admin-oriented behavior | Existing account UI |
+| Admin authentication and authorization | Complete | `/admin/*` now requires bootstrap token or verified admin JWT | Existing admin APIs |
+| Trustworthy token validation for userinfo/introspection | Complete | Token verification now checks signature, issuer, and session-backed protocol flows | Existing protocol endpoints |
+| Client secret hardening | Complete | Client secrets are hashed before persistence | Existing client persistence |
+| TOTP secret hardening | Complete | TOTP secrets are protected at rest and revealed only for verification | Existing credential model |
+| Account/admin boundary cleanup | Complete | Account UI now uses self-service `/account` endpoints with bearer token context | Existing account UI |
 | Repository hygiene for tracked generated artifacts | Planned | Build/test artifacts still create repo noise | Current repo state |
 
 ## Phase 2: OIDC Core Compliance
 
 | Task | Status | Note | Dependency |
 | --- | --- | --- | --- |
-| Authorization code flow with PKCE | Not Started | Not implemented in backend today | Phase 1 hardening |
-| Refresh tokens | Not Started | No issuance or revocation model exists today | Phase 1 hardening |
-| Redirect URI validation | Not Started | Schema field exists, product behavior does not | Phase 1 hardening |
-| Client grant-type controls | Not Started | Not implemented in current admin/client model | Phase 1 hardening |
-| Discovery document alignment | Planned | Discovery exists but does not match full implementation | Phase 1 hardening |
-| Production-grade JWKS/key distribution model | Not Started | Current certs endpoint is only a placeholder | Phase 1 hardening |
+| Authorization code flow with PKCE | Complete | Authorize endpoint, PKCE validation, and code exchange now exist | Phase 1 hardening |
+| Refresh tokens | Complete | Refresh issuance, rotation-by-revocation, and revoke endpoint now exist | Phase 1 hardening |
+| Redirect URI validation | Complete | Registered redirect URIs are stored on clients and enforced on authorize/code exchange | Phase 1 hardening |
+| Client grant-type controls | Complete | Clients now carry allowed grant types enforced at token/authorize endpoints | Phase 1 hardening |
+| Discovery document alignment | Complete | Discovery now advertises authorize, token, revoke, PKCE, and RS256 signing metadata | Phase 1 hardening |
+| Production-grade JWKS/key distribution model | In Progress | RS256 signing and JWKS certs now exist; key persistence/rotation hardening still remains | Phase 1 hardening |
 
 ## Phase 3: Productized Admin and Account Experience
 
@@ -52,8 +52,8 @@ This file tracks delivery status for the current product baseline and the phased
 | --- | --- | --- | --- |
 | Admin UI for current CRUD baseline | Complete | Minimal operational UI exists today | - |
 | Transitional account UI | Complete | Profile/password/TOTP/sessions surface exists | - |
-| Authenticated account portal | Not Started | Manual realm/user ID entry still required today | Phase 1-2 |
-| Account self-service semantics | Not Started | Current UI uses admin-oriented endpoints/behavior | Phase 1-2 |
+| Authenticated account portal | In Progress | Account UI now uses bearer-token self-service APIs, but still needs full login/session UX | Phase 1-2 |
+| Account self-service semantics | In Progress | Dedicated `/account` APIs exist; broader UX/productization remains Phase 3 work | Phase 1-2 |
 | Improved admin workflows | Not Started | Current UI is functional but minimal | Phase 1-2 |
 | Audit/event visibility in UI | Not Started | Backend event APIs exist; no UI surface yet | Phase 1-2 |
 
@@ -82,8 +82,8 @@ This file tracks delivery status for the current product baseline and the phased
 
 | Epic | Status | Note | Target Phase |
 | --- | --- | --- | --- |
-| Auth flows and token lifecycle | Planned | Covers auth code, PKCE, refresh, revocation, stronger token model | Phase 2 |
-| MFA and recovery maturity | Planned | Covers MFA policy growth, recovery, and future factor expansion | Phase 2-3 |
+| Auth flows and token lifecycle | In Progress | Password, auth code, PKCE, refresh, revoke, RS256 signing, and JWKS now exist; key lifecycle hardening still remains | Phase 2 |
+| MFA and recovery maturity | In Progress | Baseline TOTP and recovery flows exist; policy and factor expansion remain | Phase 2-3 |
 | User/profile lifecycle maturity | Planned | Covers richer self-service, lifecycle, and account experience work | Phase 3 |
 | Org/tenant and branding | Not Started | Covers organization model, delegated admin, branding, and localization | Phase 4-5 |
 | RBAC/ABAC/consent | Not Started | Covers richer authorization and consent domains | Phase 4 |

@@ -27,9 +27,13 @@ public class SessionService {
 
   @Transactional
   public ClientSessionEntity attachClientSession(UserSessionEntity us, ClientEntity client) {
+    UserSessionEntity managedSession = em.find(UserSessionEntity.class, us.getId());
+    if (managedSession == null) {
+      throw new IllegalStateException("User session not found");
+    }
     ClientSessionEntity cs = new ClientSessionEntity();
     cs.setId(UUID.randomUUID());
-    cs.setUserSession(us);
+    cs.setUserSession(managedSession);
     cs.setClient(client);
     em.persist(cs);
     return cs;
@@ -37,7 +41,10 @@ public class SessionService {
 
   @Transactional
   public void touch(UserSessionEntity us) {
-    us.setLastRefresh(OffsetDateTime.now());
+    UserSessionEntity managedSession = em.find(UserSessionEntity.class, us.getId());
+    if (managedSession != null) {
+      managedSession.setLastRefresh(OffsetDateTime.now());
+    }
   }
 
   @Transactional
@@ -48,4 +55,3 @@ public class SessionService {
     }
   }
 }
-

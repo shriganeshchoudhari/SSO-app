@@ -24,13 +24,17 @@ public class OidcDiscoveryResource {
     String base = issuer;
     Map<String, Object> cfg = new HashMap<>();
     cfg.put("issuer", base);
+    cfg.put("authorization_endpoint", base + "/auth/realms/{realm}/protocol/openid-connect/auth");
     cfg.put("token_endpoint", base + "/auth/realms/{realm}/protocol/openid-connect/token");
+    cfg.put("revocation_endpoint", base + "/auth/realms/{realm}/protocol/openid-connect/revoke");
     cfg.put("userinfo_endpoint", base + "/auth/realms/{realm}/protocol/openid-connect/userinfo");
     cfg.put("jwks_uri", base + "/auth/realms/{realm}/protocol/openid-connect/certs");
     cfg.put("introspection_endpoint", base + "/auth/realms/{realm}/protocol/openid-connect/token/introspect");
-    cfg.put("grant_types_supported", List.of("password"));
+    cfg.put("grant_types_supported", List.of("password", "authorization_code", "refresh_token"));
+    cfg.put("response_types_supported", List.of("code"));
+    cfg.put("code_challenge_methods_supported", List.of("S256", "plain"));
     cfg.put("subject_types_supported", List.of("public"));
-    cfg.put("id_token_signing_alg_values_supported", List.of("HS256"));
+    cfg.put("id_token_signing_alg_values_supported", List.of("RS256"));
     cfg.put("token_endpoint_auth_methods_supported", List.of("client_secret_basic", "client_secret_post", "none"));
     return cfg;
   }

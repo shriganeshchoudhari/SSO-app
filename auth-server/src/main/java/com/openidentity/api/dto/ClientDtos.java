@@ -1,5 +1,6 @@
 package com.openidentity.api.dto;
 
+import java.util.List;
 import java.util.UUID;
 
 public class ClientDtos {
@@ -8,11 +9,15 @@ public class ClientDtos {
     public String protocol;
     public String secret;
     public Boolean publicClient;
+    public List<String> redirectUris;
+    public List<String> grantTypes;
   }
 
   public static class UpdateClientRequest {
     public String secret;
     public Boolean publicClient;
+    public List<String> redirectUris;
+    public List<String> grantTypes;
   }
 
   public static class ClientResponse {
@@ -21,15 +26,25 @@ public class ClientDtos {
     public String clientId;
     public String protocol;
     public Boolean publicClient;
+    public List<String> redirectUris;
+    public List<String> grantTypes;
 
     public ClientResponse() {}
-    public ClientResponse(UUID id, UUID realmId, String clientId, String protocol, Boolean publicClient) {
+    public ClientResponse(
+        UUID id,
+        UUID realmId,
+        String clientId,
+        String protocol,
+        Boolean publicClient,
+        List<String> redirectUris,
+        List<String> grantTypes) {
       this.id = id;
       this.realmId = realmId;
       this.clientId = clientId;
       this.protocol = protocol;
       this.publicClient = publicClient;
+      this.redirectUris = redirectUris;
+      this.grantTypes = grantTypes;
     }
   }
 }
-

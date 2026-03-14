@@ -26,6 +26,13 @@
         <sqlFile relativeToChangelogFile="true" path="0003-audit-events.sql" endDelimiter=";" splitStatements="true" />
     </changeSet>
 
+    <changeSet id="0004-oidc-core-postgresql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0004-oidc-core.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
     <changeSet id="0001-initial-schema-h2" author="openidentity">
         <preConditions onFail="MARK_RAN">
             <dbms type="h2"/>
@@ -45,6 +52,13 @@
             <dbms type="h2"/>
         </preConditions>
         <sqlFile relativeToChangelogFile="true" path="0003-audit-events-h2.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0004-oidc-core-h2" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="h2"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0004-oidc-core-h2.sql" endDelimiter=";" splitStatements="true" />
     </changeSet>
 
     <changeSet id="0001-initial-schema-mysql" author="openidentity">
@@ -68,6 +82,13 @@
         <sqlFile relativeToChangelogFile="true" path="0003-audit-events-mysql.sql" endDelimiter=";" splitStatements="true" />
     </changeSet>
 
+    <changeSet id="0004-oidc-core-mysql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mysql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0004-oidc-core-mysql.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
     <changeSet id="0001-initial-schema-mariadb" author="openidentity">
         <preConditions onFail="MARK_RAN">
             <dbms type="mariadb"/>
@@ -89,6 +110,13 @@
         <sqlFile relativeToChangelogFile="true" path="0003-audit-events-mariadb.sql" endDelimiter=";" splitStatements="true" />
     </changeSet>
 
+    <changeSet id="0004-oidc-core-mariadb" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mariadb"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0004-oidc-core-mariadb.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
     <changeSet id="0001-initial-schema-oracle" author="openidentity">
         <preConditions onFail="MARK_RAN">
             <dbms type="oracle"/>
@@ -108,5 +136,12 @@
             <dbms type="oracle"/>
         </preConditions>
         <sqlFile relativeToChangelogFile="true" path="0003-audit-events-oracle.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0004-oidc-core-oracle" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="oracle"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0004-oidc-core-oracle.sql" endDelimiter=";" splitStatements="true" />
     </changeSet>
 </databaseChangeLog>

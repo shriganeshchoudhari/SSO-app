@@ -33,6 +33,13 @@ public class SecretProtectionService {
     return BCrypt.hashpw(secret, BCrypt.gensalt(12));
   }
 
+  public boolean verifyClientSecret(String presentedSecret, String storedHash) {
+    if (presentedSecret == null || presentedSecret.isBlank() || storedHash == null || storedHash.isBlank()) {
+      return false;
+    }
+    return BCrypt.checkpw(presentedSecret, storedHash);
+  }
+
   public String protectTotpSecret(String secret) {
     if (secret == null || secret.isBlank()) {
       return secret;
