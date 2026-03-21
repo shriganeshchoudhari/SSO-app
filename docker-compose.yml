@@ -1,0 +1,75 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: openidentity-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: openid
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d openid"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: openidentity-auth
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "7070:7070"
+    environment:
+      DB_KIND: postgresql
+      DB_URL: jdbc:postgresql://postgres:5432/openid
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      HTTP_PORT: "7070"
+      # Generate a strong random value for production:
+      OPENIDENTITY_ADMIN_BOOTSTRAP_TOKEN: "change-me-in-production"
+      OPENIDENTITY_SECRET_PROTECTION_KEY: "change-me-in-production"
+      # Leave blank to auto-generate RS256 key on first boot (persisted to DB):
+      OPENIDENTITY_JWT_PRIVATE_KEY_PEM: ""
+      OPENIDENTITY_JWT_PUBLIC_KEY_PEM: ""
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:7070/q/health/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  admin-ui:
+    build:
+      context: admin-ui
+      dockerfile: Dockerfile
+    container_name: openidentity-admin-ui
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - auth-server
+
+  account-ui:
+    build:
+      context: account-ui
+      dockerfile: Dockerfile
+    container_name: openidentity-account-ui
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    depends_on:
+      - auth-server
+
+volumes:
+  pgdata:

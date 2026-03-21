@@ -6,7 +6,9 @@ import com.openidentity.domain.RealmEntity;
 import com.openidentity.domain.UserEntity;
 import com.openidentity.domain.UserSessionEntity;
 import com.openidentity.service.EventService;
+import com.openidentity.service.LdapFederationService;
 import com.openidentity.service.MfaTotpService;
+import com.openidentity.service.ObservabilityService;
 import com.openidentity.service.OidcClientService;
 import com.openidentity.service.OidcGrantService;
 import com.openidentity.service.SecretProtectionService;
@@ -36,7 +38,9 @@ public class AuthTokenResource {
   @Inject SessionService sessionService;
   @Inject MfaTotpService mfaTotpService;
   @Inject EventService eventService;
+  @Inject LdapFederationService ldapFederationService;
   @Inject SecretProtectionService secretProtectionService;
+  @Inject ObservabilityService observabilityService;
   @Inject OidcClientService oidcClientService;
   @Inject OidcGrantService oidcGrantService;
   @Inject TokenIssuerService tokenIssuerService;
@@ -48,6 +52,8 @@ public class AuthTokenResource {
     public String token_type = "Bearer";
     public long expires_in;
   }
+
+  private record AuthenticatedUser(UserEntity user, String source, String providerName) {}
 
   @POST
   @Operation(summary = "Token endpoint")
@@ -64,13 +70,21 @@ public class AuthTokenResource {
       @FormParam("code_verifier") String codeVerifier,
       @FormParam("refresh_token") String refreshToken) {
     RealmEntity realm = requireRealm(realmName);
-    return switch (grantType) {
-      case "password" -> passwordGrant(realm, clientId, clientSecret, username, password, totp);
-      case "authorization_code" ->
-          authorizationCodeGrant(realm, clientId, clientSecret, code, redirectUri, codeVerifier);
-      case "refresh_token" -> refreshTokenGrant(realm, clientId, clientSecret, refreshToken);
-      default -> throw new WebApplicationException("unsupported_grant_type", Response.Status.BAD_REQUEST);
-    };
+    try {
+      return switch (grantType) {
+        case "password" -> passwordGrant(realm, clientId, clientSecret, username, password, totp);
+        case "authorization_code" ->
+            authorizationCodeGrant(realm, clientId, clientSecret, code, redirectUri, codeVerifier);
+        case "refresh_token" -> refreshTokenGrant(realm, clientId, clientSecret, refreshToken);
+        default -> throw new WebApplicationException("unsupported_grant_type", Response.Status.BAD_REQUEST);
+      };
+    } catch (WebApplicationException e) {
+      observabilityService.recordTokenGrant(grantType, "error", "unknown");
+      throw e;
+    } catch (RuntimeException e) {
+      observabilityService.recordTokenGrant(grantType, "error", "unknown");
+      throw e;
+    }
   }
 
   private Response passwordGrant(
@@ -90,26 +104,27 @@ public class AuthTokenResource {
       oidcClientService.requireClientAuthentication(client, clientSecret);
     }
 
-    UserEntity user = authenticateUser(realm, username, password, totp);
-    UserSessionEntity session = sessionService.createUserSession(realm, user);
+    AuthenticatedUser authenticatedUser = authenticateUser(realm, username, password, totp);
+    UserSessionEntity session = sessionService.createUserSession(realm, authenticatedUser.user());
     if (client != null) {
       sessionService.attachClientSession(session, client);
     }
 
     TokenIssuerService.IssuedTokens issuedTokens = tokenIssuerService.issueTokens(
         realm,
-        user,
+        authenticatedUser.user(),
         client,
         session,
         null,
         client != null && oidcClientService.allowedGrantTypes(client).contains("refresh_token"));
     eventService.loginEvent(
         realm,
-        user,
+        authenticatedUser.user(),
         client,
         "LOGIN",
         null,
-        "{\"grant_type\":\"password\"}");
+        buildPasswordGrantDetails(authenticatedUser));
+    observabilityService.recordTokenGrant("password", "success", authenticatedUser.source());
     return Response.ok(toResponse(issuedTokens)).build();
   }
 
@@ -137,6 +152,7 @@ public class AuthTokenResource {
         authorizationCode.getUserSession(),
         authorizationCode.getScope(),
         oidcClientService.allowedGrantTypes(client).contains("refresh_token"));
+    observabilityService.recordTokenGrant("authorization_code", "success", "authorization_code");
     return Response.ok(toResponse(issuedTokens)).build();
   }
 
@@ -161,6 +177,7 @@ public class AuthTokenResource {
         storedRefreshToken.getUserSession(),
         storedRefreshToken.getScope(),
         true);
+    observabilityService.recordTokenGrant("refresh_token", "success", "refresh_token");
     return Response.ok(toResponse(issuedTokens)).build();
   }
 
@@ -176,7 +193,7 @@ public class AuthTokenResource {
     return realm;
   }
 
-  private UserEntity authenticateUser(RealmEntity realm, String username, String password, String totp) {
+  private AuthenticatedUser authenticateUser(RealmEntity realm, String username, String password, String totp) {
     UserEntity user = em.createQuery(
             "select u from UserEntity u where u.realm.id = :rid and u.username = :un",
             UserEntity.class)
@@ -186,7 +203,15 @@ public class AuthTokenResource {
         .findFirst()
         .orElse(null);
     if (user == null || Boolean.FALSE.equals(user.getEnabled())) {
-      throw new WebApplicationException("invalid_grant", Response.Status.UNAUTHORIZED);
+      if (user != null) {
+        throw new WebApplicationException("invalid_grant", Response.Status.UNAUTHORIZED);
+      }
+      var ldapAuthenticated = ldapFederationService.authenticateAndProvision(realm, username, password);
+      if (ldapAuthenticated == null || Boolean.FALSE.equals(ldapAuthenticated.user().getEnabled())) {
+        throw new WebApplicationException("invalid_grant", Response.Status.UNAUTHORIZED);
+      }
+      enforceTotpIfConfigured(ldapAuthenticated.user(), totp);
+      return new AuthenticatedUser(ldapAuthenticated.user(), "ldap", ldapAuthenticated.providerName());
     }
 
     CredentialEntity passwordCredential = em.createQuery(
@@ -197,10 +222,20 @@ public class AuthTokenResource {
         .getResultStream()
         .findFirst()
         .orElse(null);
-    if (passwordCredential == null || !BCrypt.checkpw(password, passwordCredential.getValueHash())) {
-      throw new WebApplicationException("invalid_grant", Response.Status.UNAUTHORIZED);
+    if (passwordCredential != null && BCrypt.checkpw(password, passwordCredential.getValueHash())) {
+      enforceTotpIfConfigured(user, totp);
+      return new AuthenticatedUser(user, "local", null);
     }
 
+    var ldapAuthenticated = ldapFederationService.authenticateAndProvision(realm, username, password);
+    if (ldapAuthenticated == null || Boolean.FALSE.equals(ldapAuthenticated.user().getEnabled())) {
+      throw new WebApplicationException("invalid_grant", Response.Status.UNAUTHORIZED);
+    }
+    enforceTotpIfConfigured(ldapAuthenticated.user(), totp);
+    return new AuthenticatedUser(ldapAuthenticated.user(), "ldap", ldapAuthenticated.providerName());
+  }
+
+  private void enforceTotpIfConfigured(UserEntity user, String totp) {
     var totpCredential = em.createQuery(
             "select c from CredentialEntity c where c.user.id = :uid and c.type = 'totp' order by c.createdAt desc",
             CredentialEntity.class)
@@ -214,7 +249,17 @@ public class AuthTokenResource {
         throw new WebApplicationException("invalid_grant", Response.Status.UNAUTHORIZED);
       }
     }
-    return user;
+  }
+
+  private String buildPasswordGrantDetails(AuthenticatedUser authenticatedUser) {
+    StringBuilder details = new StringBuilder("{\"grant_type\":\"password\",\"auth_source\":\"")
+        .append(authenticatedUser.source())
+        .append("\"");
+    if (authenticatedUser.providerName() != null && !authenticatedUser.providerName().isBlank()) {
+      details.append(",\"ldap_provider\":\"").append(authenticatedUser.providerName()).append("\"");
+    }
+    details.append("}");
+    return details.toString();
   }
 
   private TokenResponse toResponse(TokenIssuerService.IssuedTokens issuedTokens) {

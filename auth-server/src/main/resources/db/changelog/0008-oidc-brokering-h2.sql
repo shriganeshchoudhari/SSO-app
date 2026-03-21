@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS oidc_identity_provider (
+  id UUID PRIMARY KEY,
+  realm_id UUID NOT NULL,
+  alias VARCHAR(255) NOT NULL,
+  issuer_url VARCHAR(1024) NOT NULL,
+  authorization_url VARCHAR(1024),
+  token_url VARCHAR(1024),
+  user_info_url VARCHAR(1024),
+  jwks_url VARCHAR(1024),
+  client_id VARCHAR(255) NOT NULL,
+  client_secret VARCHAR(4000),
+  scopes_raw VARCHAR(2000),
+  username_claim VARCHAR(255),
+  email_claim VARCHAR(255),
+  sync_attributes_on_login BOOLEAN DEFAULT TRUE NOT NULL,
+  enabled BOOLEAN DEFAULT TRUE NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_oidc_identity_provider_realm FOREIGN KEY (realm_id) REFERENCES realm(id) ON DELETE CASCADE,
+  CONSTRAINT uq_oidc_identity_provider UNIQUE (realm_id, alias)
+);

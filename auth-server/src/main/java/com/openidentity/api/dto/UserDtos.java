@@ -21,16 +21,20 @@ public class UserDtos {
     public String email;
     public Boolean enabled;
     public Boolean emailVerified;
+    public String federationSource;
+    public UUID federationProviderId;
 
     public UserResponse() {}
-    public UserResponse(UUID id, UUID realmId, String username, String email, Boolean enabled, Boolean emailVerified) {
+    public UserResponse(UUID id, UUID realmId, String username, String email, Boolean enabled, Boolean emailVerified,
+                        String federationSource, UUID federationProviderId) {
       this.id = id;
       this.realmId = realmId;
       this.username = username;
       this.email = email;
       this.enabled = enabled;
       this.emailVerified = emailVerified;
+      this.federationSource = federationSource;
+      this.federationProviderId = federationProviderId;
     }
   }
 }
-

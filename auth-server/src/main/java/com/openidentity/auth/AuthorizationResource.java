@@ -1,7 +1,9 @@
 package com.openidentity.auth;
 
 import com.openidentity.domain.ClientEntity;
+import com.openidentity.domain.OidcIdentityProviderEntity;
 import com.openidentity.domain.RealmEntity;
+import com.openidentity.domain.SamlIdentityProviderEntity;
 import com.openidentity.domain.UserEntity;
 import com.openidentity.domain.UserSessionEntity;
 import com.openidentity.service.MfaTotpService;
@@ -24,6 +26,7 @@ import jakarta.ws.rs.core.Response;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.mindrot.jbcrypt.BCrypt;
 
 @Path("/auth/realms/{realm}/protocol/openid-connect/auth")
@@ -48,6 +51,7 @@ public class AuthorizationResource {
       @QueryParam("code_challenge_method") String codeChallengeMethod) {
     RealmEntity realm = requireRealm(realmName);
     ClientEntity client = validateAuthorizeRequest(realm, responseType, clientId, redirectUri, codeChallenge);
+    String brokerOptions = buildBrokerOptions(realm, responseType, clientId, redirectUri, scope, state, codeChallenge, codeChallengeMethod);
     String html = """
         <!doctype html>
         <html>
@@ -67,6 +71,7 @@ public class AuthorizationResource {
           <label>TOTP <input name="totp" /></label><br/>
           <button type="submit">Sign in</button>
         </form>
+        %s
         <p>Client: %s</p>
         </body>
         </html>
@@ -79,6 +84,7 @@ public class AuthorizationResource {
         escapeHtml(state != null ? state : ""),
         escapeHtml(codeChallenge != null ? codeChallenge : ""),
         escapeHtml(codeChallengeMethod != null ? codeChallengeMethod : ""),
+        brokerOptions,
         escapeHtml(client.getClientId()));
     return Response.ok(html).type(MediaType.TEXT_HTML).build();
   }
@@ -205,5 +211,62 @@ public class AuthorizationResource {
         .replace("<", "&lt;")
         .replace(">", "&gt;")
         .replace("\"", "&quot;");
+  }
+
+  private String buildBrokerOptions(
+      RealmEntity realm,
+      String responseType,
+      String clientId,
+      String redirectUri,
+      String scope,
+      String state,
+      String codeChallenge,
+      String codeChallengeMethod) {
+    List<OidcIdentityProviderEntity> oidcProviders = em.createQuery(
+            "select p from OidcIdentityProviderEntity p where p.realm.id = :realmId and p.enabled = true order by p.alias",
+            OidcIdentityProviderEntity.class)
+        .setParameter("realmId", realm.getId())
+        .getResultList();
+    List<SamlIdentityProviderEntity> samlProviders = em.createQuery(
+            "select p from SamlIdentityProviderEntity p where p.realm.id = :realmId and p.enabled = true order by p.alias",
+            SamlIdentityProviderEntity.class)
+        .setParameter("realmId", realm.getId())
+        .getResultList();
+    if (oidcProviders.isEmpty() && samlProviders.isEmpty()) {
+      return "";
+    }
+    StringBuilder builder = new StringBuilder("<h2>External identity providers</h2><ul>");
+    for (OidcIdentityProviderEntity provider : oidcProviders) {
+      String link = "/auth/realms/" + urlEncode(realm.getName()) + "/broker/oidc/" + urlEncode(provider.getAlias())
+          + "/login?response_type=" + urlEncode(responseType)
+          + "&client_id=" + urlEncode(clientId)
+          + "&redirect_uri=" + urlEncode(redirectUri)
+          + "&scope=" + urlEncode(scope != null ? scope : "")
+          + "&state=" + urlEncode(state != null ? state : "")
+          + "&code_challenge=" + urlEncode(codeChallenge != null ? codeChallenge : "")
+          + "&code_challenge_method=" + urlEncode(codeChallengeMethod != null ? codeChallengeMethod : "");
+      builder.append("<li><a href=\"")
+          .append(escapeHtml(link))
+          .append("\">Continue with ")
+          .append(escapeHtml(provider.getAlias()))
+          .append("</a></li>");
+    }
+    for (SamlIdentityProviderEntity provider : samlProviders) {
+      String link = "/auth/realms/" + urlEncode(realm.getName()) + "/broker/saml/" + urlEncode(provider.getAlias())
+          + "/login?response_type=" + urlEncode(responseType)
+          + "&client_id=" + urlEncode(clientId)
+          + "&redirect_uri=" + urlEncode(redirectUri)
+          + "&scope=" + urlEncode(scope != null ? scope : "")
+          + "&state=" + urlEncode(state != null ? state : "")
+          + "&code_challenge=" + urlEncode(codeChallenge != null ? codeChallenge : "")
+          + "&code_challenge_method=" + urlEncode(codeChallengeMethod != null ? codeChallengeMethod : "");
+      builder.append("<li><a href=\"")
+          .append(escapeHtml(link))
+          .append("\">Continue with ")
+          .append(escapeHtml(provider.getAlias()))
+          .append(" (SAML)</a></li>");
+    }
+    builder.append("</ul>");
+    return builder.toString();
   }
 }

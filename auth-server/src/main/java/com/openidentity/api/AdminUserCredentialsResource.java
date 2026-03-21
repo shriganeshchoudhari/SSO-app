@@ -2,6 +2,7 @@ package com.openidentity.api;
 
 import com.openidentity.domain.CredentialEntity;
 import com.openidentity.domain.UserEntity;
+import com.openidentity.service.FederationPolicyService;
 import com.openidentity.service.MfaTotpService;
 import com.openidentity.service.SecretProtectionService;
 import org.eclipse.microprofile.openapi.annotations.Operation;
@@ -33,6 +34,7 @@ public class AdminUserCredentialsResource {
   }
 
   @Inject EntityManager em;
+  @Inject FederationPolicyService federationPolicyService;
   @Inject MfaTotpService mfaTotpService;
   @Inject SecretProtectionService secretProtectionService;
 
@@ -46,6 +48,7 @@ public class AdminUserCredentialsResource {
     }
     UserEntity u = em.find(UserEntity.class, userId);
     if (u == null || !u.getRealm().getId().equals(realmId)) throw new NotFoundException();
+    federationPolicyService.ensureLocalPasswordAllowed(u);
     // Remove existing password credentials
     em.createQuery("delete from CredentialEntity c where c.user.id = :uid and c.type = 'password'")
         .setParameter("uid", userId).executeUpdate();

@@ -6,6 +6,7 @@ import com.openidentity.domain.UserEntity;
 import com.openidentity.domain.UserSessionEntity;
 import com.openidentity.security.TokenValidationService;
 import com.openidentity.security.VerifiedToken;
+import com.openidentity.service.FederationPolicyService;
 import com.openidentity.service.MfaTotpService;
 import com.openidentity.service.SecretProtectionService;
 import io.smallrye.common.annotation.Blocking;
@@ -38,6 +39,7 @@ import org.mindrot.jbcrypt.BCrypt;
 public class AccountResource {
   @Inject EntityManager em;
   @Inject TokenValidationService tokenValidationService;
+  @Inject FederationPolicyService federationPolicyService;
   @Inject MfaTotpService mfaTotpService;
   @Inject SecretProtectionService secretProtectionService;
 
@@ -74,7 +76,7 @@ public class AccountResource {
     VerifiedToken token = tokenValidationService.verifyBearerHeaderWithSession(authHeader);
     UserEntity user = requireUser(token);
     return new UserResponse(user.getId(), user.getRealm().getId(), user.getUsername(), user.getEmail(),
-        user.getEnabled(), user.getEmailVerified());
+        user.getEnabled(), user.getEmailVerified(), user.getFederationSource(), user.getFederationProviderId());
   }
 
   @PUT
@@ -87,6 +89,9 @@ public class AccountResource {
       throw new BadRequestException("request body is required");
     }
     if (req.email != null) {
+      if (!req.email.equals(user.getEmail())) {
+        federationPolicyService.ensureEmailEditable(user);
+      }
       user.setEmail(req.email);
     }
     return Response.noContent().build();
@@ -101,6 +106,7 @@ public class AccountResource {
     if (req == null || req.password == null || req.password.isBlank()) {
       throw new BadRequestException("password is required");
     }
+    federationPolicyService.ensureLocalPasswordAllowed(user);
     em.createQuery("delete from CredentialEntity c where c.user.id = :uid and c.type = 'password'")
         .setParameter("uid", user.getId())
         .executeUpdate();

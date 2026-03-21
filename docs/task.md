@@ -61,9 +61,9 @@ This file tracks delivery status for the current product baseline and the phased
 
 | Task | Status | Note | Dependency |
 | --- | --- | --- | --- |
-| LDAP/AD federation | Not Started | No implementation in repo | Phase 1-3 baseline |
-| OIDC/SAML brokering | Not Started | No implementation in repo | Phase 1-3 baseline |
-| SAML support | Not Started | No implementation in repo | Phase 1-3 baseline |
+| LDAP/AD federation | In Progress | Persisted LDAP provider configuration, admin CRUD/UI management, password-grant fallback with local user provisioning, LDAP-managed read-only password/profile policy, provider-controlled login-time sync/disable-missing behavior, and scheduled/manual provider reconciliation now exist; broader lifecycle reconciliation still remains | Phase 1-3 baseline |
+| OIDC/SAML brokering | In Progress | OIDC broker provider configuration, persistence, admin CRUD/UI management, broker start/callback flow, external code exchange, local user linking, read-only managed-user policy, admin detachment back to local accounts, local authorization-code handoff, and SAML provider/browser-flow validation now exist; SAML SP metadata, signed AuthnRequest support, and both SP-initiated and IdP-initiated logout flow groundwork now exist as well, including signed logout responses when signed SP messages are enabled, but broader broker lifecycle still remains | Phase 1-3 baseline |
+| SAML support | In Progress | SAML identity provider persistence, admin CRUD/UI groundwork, SP metadata with signing key publication and SingleLogoutService, AuthnRequest initiation, optional AuthnRequest XML signing, ACS handling, request-bound issuer/audience/destination/time validation, certificate-backed XML signature verification, SP-initiated logout initiation/callback flow, IdP-initiated logout request handling/response, signed logout responses when signed SP messages are enabled, and local user linking now exist; broader production hardening still remains | Phase 1-3 baseline |
 | Tenant/organization policy groundwork | Not Started | No implementation in repo | Phase 1-3 baseline |
 | SCIM provisioning | Not Started | No implementation in repo | Phase 1-3 baseline |
 
@@ -73,7 +73,7 @@ This file tracks delivery status for the current product baseline and the phased
 | --- | --- | --- | --- |
 | Current CI pipeline | Complete | Build/test/audit/CodeQL workflow exists | - |
 | Production deployment assets | Not Started | No committed Docker/K8s/Helm assets | Earlier product phases |
-| Metrics/tracing/operational observability | Not Started | Not implemented in repo | Earlier product phases |
+| Metrics/tracing/operational observability | In Progress | `/q/health` and `/q/metrics` now exist with readiness checks for JWT signing/secret protection plus app counters for token and broker flows; tracing, alerting, and broader operational dashboards still remain | Earlier product phases |
 | Shared session/rate-limit state | Not Started | No HA/shared-state infra model yet | Earlier product phases |
 | Backup/restore runbooks | Not Started | Not documented in repo | Earlier product phases |
 | Release quality gates beyond current CI | Not Started | Future operational maturity work | Earlier product phases |
@@ -84,13 +84,13 @@ This file tracks delivery status for the current product baseline and the phased
 | --- | --- | --- | --- |
 | Auth flows and token lifecycle | In Progress | Password, auth code, PKCE, refresh, revoke, RS256 signing, and JWKS now exist; key lifecycle hardening still remains | Phase 2 |
 | MFA and recovery maturity | In Progress | Baseline TOTP and recovery flows exist; policy and factor expansion remain | Phase 2-3 |
-| User/profile lifecycle maturity | In Progress | Account portal sign-in and core self-service flows now exist; broader lifecycle UX still remains | Phase 3 |
+| User/profile lifecycle maturity | In Progress | Account portal sign-in and core self-service flows now exist; admin detachment of externally managed users back to local accounts now exists, but broader lifecycle UX still remains | Phase 3 |
 | Org/tenant and branding | Not Started | Covers organization model, delegated admin, branding, and localization | Phase 4-5 |
 | RBAC/ABAC/consent | Not Started | Covers richer authorization and consent domains | Phase 4 |
-| Provisioning and federation | Not Started | Covers LDAP/AD, brokering, SCIM, and sync | Phase 4 |
+| Provisioning and federation | In Progress | LDAP provider management, read-only federated login, local drift protection, login-time sync controls, scheduled/manual reconciliation, OIDC broker provider configuration, live OIDC broker handoff, managed-user read-only policy, admin detachment to local accounts, and SAML browser-flow validation with cert-backed signature checks, signed AuthnRequest support, signed logout responses, and both SP-initiated and IdP-initiated logout handling now exist; SCIM and richer lifecycle policy still remain | Phase 4 |
 | Developer APIs, SDKs, and webhooks | Not Started | Covers config-as-code, SDKs, event delivery, and expanded platform APIs | Phase 4-5 |
-| Audit, monitoring, and compliance | In Progress | Admin UI now surfaces audit/login events; broader monitoring and compliance work still remains | Phase 3-5 |
-| Deployment and infrastructure maturity | Not Started | Covers containerization, observability, HA state, and runbooks | Phase 5 |
+| Audit, monitoring, and compliance | In Progress | Admin UI now surfaces audit/login events, and backend observability now exposes health/metrics with token and broker counters; broader tracing, alerting, and compliance work still remains | Phase 3-5 |
+| Deployment and infrastructure maturity | In Progress | Runtime observability baseline is now present via health and Prometheus-style metrics; containerization, HA state, and runbooks still remain | Phase 5 |
 
 ## Documentation Alignment
 

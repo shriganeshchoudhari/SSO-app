@@ -7,6 +7,7 @@ type User = {
   email?: string
   enabled?: boolean
   emailVerified?: boolean
+  federationSource?: string | null
 }
 
 type Session = {
@@ -40,6 +41,7 @@ export default function App() {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const canUseAccount = accessToken.trim().length > 0
+  const externallyManaged = Boolean(user?.federationSource)
 
   const authHeaders = (json = false) => ({
     Authorization: `Bearer ${accessToken.trim()}`,
@@ -284,26 +286,40 @@ export default function App() {
             <h2 style={{ marginTop: 0 }}>Profile</h2>
             <div><strong>Username:</strong> {user.username}</div>
             <div><strong>Realm:</strong> {realm}</div>
+            <div><strong>Identity Source:</strong> {user.federationSource ? user.federationSource.toUpperCase() : 'LOCAL'}</div>
             <div style={{ marginTop: 8 }}>
               <strong>Email:</strong>{' '}
-              <input value={email} onChange={e => setEmail(e.target.value)} />
-              <button onClick={saveEmail} style={{ marginLeft: 8 }}>Save</button>
+              <input value={email} onChange={e => setEmail(e.target.value)} disabled={externallyManaged} />
+              <button onClick={saveEmail} style={{ marginLeft: 8 }} disabled={externallyManaged}>Save</button>
             </div>
+            {externallyManaged ? (
+              <p style={{ marginBottom: 0 }}>
+                Profile changes are managed by your external identity provider.
+              </p>
+            ) : null}
             <div><strong>Enabled:</strong> {user.enabled ? 'Yes' : 'No'}</div>
             <div><strong>Email Verified:</strong> {user.emailVerified ? 'Yes' : 'No'}</div>
           </section>
 
           <section style={{ marginBottom: 24, padding: 16, border: '1px solid #ddd', borderRadius: 8 }}>
             <h2 style={{ marginTop: 0 }}>Change Password</h2>
-            <input
-              type="password"
-              placeholder="New password"
-              value={newPassword}
-              onChange={e => setNewPassword(e.target.value)}
-            />
-            <button disabled={!newPassword} onClick={updatePassword} style={{ marginLeft: 8 }}>
-              Update
-            </button>
+            {externallyManaged ? (
+              <p style={{ marginBottom: 0 }}>
+                Password changes are managed by your external identity provider.
+              </p>
+            ) : (
+              <>
+                <input
+                  type="password"
+                  placeholder="New password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                />
+                <button disabled={!newPassword} onClick={updatePassword} style={{ marginLeft: 8 }}>
+                  Update
+                </button>
+              </>
+            )}
           </section>
 
           <section style={{ marginBottom: 24, padding: 16, border: '1px solid #ddd', borderRadius: 8 }}>

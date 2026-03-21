@@ -1,5 +1,0 @@
-com\openidentity\AdminSecurityTest.class
-com\openidentity\ClientRoleFlowTest.class
-com\openidentity\OpenApiTest.class
-com\openidentity\OidcCodeFlowTest.class
-com\openidentity\AuthFlowTest.class

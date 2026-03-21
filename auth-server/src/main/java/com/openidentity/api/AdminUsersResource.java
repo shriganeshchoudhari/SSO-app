@@ -6,7 +6,9 @@ import com.openidentity.api.dto.UserDtos.UserResponse;
 import com.openidentity.api.dto.RoleDtos.RoleResponse;
 import com.openidentity.domain.RealmEntity;
 import com.openidentity.domain.RoleEntity;
+import com.openidentity.domain.CredentialEntity;
 import com.openidentity.domain.UserEntity;
+import com.openidentity.service.FederationPolicyService;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import jakarta.inject.Inject;
@@ -21,14 +23,19 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.mindrot.jbcrypt.BCrypt;
 
 @Path("/admin/realms/{realmId}/users")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 @Tag(name = "Users", description = "User management")
 public class AdminUsersResource {
+  public static class DetachFederationRequest {
+    public String password;
+  }
 
   @Inject EntityManager em;
+  @Inject FederationPolicyService federationPolicyService;
 
   @GET
   @Operation(summary = "List users in realm")
@@ -41,7 +48,8 @@ public class AdminUsersResource {
     q.setFirstResult(first);
     q.setMaxResults(max);
     return q.getResultList().stream()
-        .map(u -> new UserResponse(u.getId(), u.getRealm().getId(), u.getUsername(), u.getEmail(), u.getEnabled(), u.getEmailVerified()))
+        .map(u -> new UserResponse(u.getId(), u.getRealm().getId(), u.getUsername(), u.getEmail(), u.getEnabled(),
+            u.getEmailVerified(), u.getFederationSource(), u.getFederationProviderId()))
         .collect(Collectors.toList());
   }
 
@@ -53,7 +61,8 @@ public class AdminUsersResource {
     if (u == null || !u.getRealm().getId().equals(realmId)) {
       throw new NotFoundException("User not found");
     }
-    return new UserResponse(u.getId(), u.getRealm().getId(), u.getUsername(), u.getEmail(), u.getEnabled(), u.getEmailVerified());
+    return new UserResponse(u.getId(), u.getRealm().getId(), u.getUsername(), u.getEmail(), u.getEnabled(),
+        u.getEmailVerified(), u.getFederationSource(), u.getFederationProviderId());
   }
 
   @GET
@@ -94,7 +103,8 @@ public class AdminUsersResource {
     u.setCreatedAt(OffsetDateTime.now());
     em.persist(u);
     return Response.created(URI.create(String.format("/admin/realms/%s/users/%s", realmId, u.getId())))
-        .entity(new UserResponse(u.getId(), realmId, u.getUsername(), u.getEmail(), u.getEnabled(), u.getEmailVerified()))
+        .entity(new UserResponse(u.getId(), realmId, u.getUsername(), u.getEmail(), u.getEnabled(),
+            u.getEmailVerified(), u.getFederationSource(), u.getFederationProviderId()))
         .build();
   }
 
@@ -107,9 +117,41 @@ public class AdminUsersResource {
     if (u == null || !u.getRealm().getId().equals(realmId)) {
       throw new NotFoundException("User not found");
     }
-    if (req.email != null) u.setEmail(req.email);
+    if (req.email != null) {
+      if (federationPolicyService.isFederated(u) && !req.email.equals(u.getEmail())) {
+        federationPolicyService.ensureEmailEditable(u);
+      }
+      u.setEmail(req.email);
+    }
     if (req.enabled != null) u.setEnabled(req.enabled);
     return Response.noContent().build();
+  }
+
+  @POST
+  @Path("/{userId}/detach-federation")
+  @Operation(summary = "Detach an externally managed user into a local account")
+  @Transactional
+  public UserResponse detachFederation(
+      @PathParam("realmId") UUID realmId,
+      @PathParam("userId") UUID userId,
+      DetachFederationRequest req) {
+    UserEntity u = em.find(UserEntity.class, userId);
+    if (u == null || !u.getRealm().getId().equals(realmId)) {
+      throw new NotFoundException("User not found");
+    }
+    if (!federationPolicyService.isFederated(u)) {
+      throw new WebApplicationException("user_is_not_federated", Response.Status.CONFLICT);
+    }
+    String password = req != null ? normalize(req.password) : null;
+    if (password == null && !hasLocalPassword(userId)) {
+      throw new BadRequestException("password is required to detach an externally managed user");
+    }
+    if (password != null) {
+      replacePassword(u, password);
+    }
+    federationPolicyService.detachToLocal(u);
+    return new UserResponse(u.getId(), u.getRealm().getId(), u.getUsername(), u.getEmail(), u.getEnabled(),
+        u.getEmailVerified(), u.getFederationSource(), u.getFederationProviderId());
   }
 
   @POST
@@ -151,5 +193,35 @@ public class AdminUsersResource {
     }
     em.remove(u);
     return Response.noContent().build();
+  }
+
+  private boolean hasLocalPassword(UUID userId) {
+    Long count = em.createQuery(
+            "select count(c) from CredentialEntity c where c.user.id = :uid and c.type = 'password'",
+            Long.class)
+        .setParameter("uid", userId)
+        .getSingleResult();
+    return count != null && count > 0;
+  }
+
+  private void replacePassword(UserEntity user, String password) {
+    em.createQuery("delete from CredentialEntity c where c.user.id = :uid and c.type = 'password'")
+        .setParameter("uid", user.getId())
+        .executeUpdate();
+    CredentialEntity cred = new CredentialEntity();
+    cred.setId(UUID.randomUUID());
+    cred.setUser(user);
+    cred.setType("password");
+    cred.setValueHash(BCrypt.hashpw(password, BCrypt.gensalt(12)));
+    cred.setCreatedAt(OffsetDateTime.now());
+    em.persist(cred);
+  }
+
+  private String normalize(String value) {
+    if (value == null) {
+      return null;
+    }
+    String normalized = value.trim();
+    return normalized.isEmpty() ? null : normalized;
   }
 }

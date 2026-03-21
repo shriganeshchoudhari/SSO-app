@@ -27,6 +27,15 @@ public class UserEntity {
   @Column(name = "email_verified")
   private Boolean emailVerified = Boolean.FALSE;
 
+  @Column(name = "federation_source")
+  private String federationSource;
+
+  @Column(name = "federation_provider_id")
+  private UUID federationProviderId;
+
+  @Column(name = "federation_external_id")
+  private String federationExternalId;
+
   @Column(name = "created_at")
   private OffsetDateTime createdAt;
 
@@ -78,6 +87,30 @@ public class UserEntity {
     this.emailVerified = emailVerified;
   }
 
+  public String getFederationSource() {
+    return federationSource;
+  }
+
+  public void setFederationSource(String federationSource) {
+    this.federationSource = federationSource;
+  }
+
+  public UUID getFederationProviderId() {
+    return federationProviderId;
+  }
+
+  public void setFederationProviderId(UUID federationProviderId) {
+    this.federationProviderId = federationProviderId;
+  }
+
+  public String getFederationExternalId() {
+    return federationExternalId;
+  }
+
+  public void setFederationExternalId(String federationExternalId) {
+    this.federationExternalId = federationExternalId;
+  }
+
   public OffsetDateTime getCreatedAt() {
     return createdAt;
   }
@@ -86,4 +119,3 @@ public class UserEntity {
     this.createdAt = createdAt;
   }
 }
-

@@ -2,7 +2,16 @@ import React, { useEffect, useMemo, useState } from 'react'
 import '@patternfly/react-core/dist/styles/base.css'
 
 type Realm = { id: string; name: string; displayName?: string; enabled?: boolean }
-type User = { id: string; realmId: string; username: string; email?: string; enabled?: boolean; emailVerified?: boolean }
+type User = {
+  id: string
+  realmId: string
+  username: string
+  email?: string
+  enabled?: boolean
+  emailVerified?: boolean
+  federationSource?: string | null
+  federationProviderId?: string | null
+}
 type Client = {
   id: string
   realmId: string
@@ -33,12 +42,59 @@ type AdminAuditEvent = {
   ipAddress?: string | null
   details?: string | null
 }
+type LdapProvider = {
+  id: string
+  realmId: string
+  name: string
+  url: string
+  bindDn?: string | null
+  userSearchBase?: string | null
+  userSearchFilter?: string | null
+  usernameAttribute?: string | null
+  emailAttribute?: string | null
+  syncAttributesOnLogin?: boolean
+  disableMissingUsers?: boolean
+  enabled?: boolean
+  bindCredentialConfigured?: boolean
+}
+type OidcBrokerProvider = {
+  id: string
+  realmId: string
+  alias: string
+  issuerUrl: string
+  authorizationUrl?: string | null
+  tokenUrl?: string | null
+  userInfoUrl?: string | null
+  jwksUrl?: string | null
+  clientId: string
+  scopes?: string[]
+  usernameClaim?: string | null
+  emailClaim?: string | null
+  syncAttributesOnLogin?: boolean
+  enabled?: boolean
+  clientSecretConfigured?: boolean
+}
+type SamlBrokerProvider = {
+  id: string
+  realmId: string
+  alias: string
+  entityId: string
+  ssoUrl: string
+  sloUrl?: string | null
+  nameIdFormat?: string | null
+  syncAttributesOnLogin?: boolean
+  wantAuthnRequestsSigned?: boolean
+  enabled?: boolean
+  x509CertificateConfigured?: boolean
+}
 
 const parseLines = (value: string) =>
   value
     .split(/\r?\n|,/)
     .map(item => item.trim())
     .filter(Boolean)
+
+const isExternallyManagedUser = (user: User) => Boolean(user.federationSource)
 
 export default function App() {
   const [accessToken, setAccessToken] = useState('')
@@ -75,6 +131,45 @@ export default function App() {
   const [loginEvents, setLoginEvents] = useState<LoginEvent[]>([])
   const [adminEvents, setAdminEvents] = useState<AdminAuditEvent[]>([])
   const [eventsLoading, setEventsLoading] = useState(false)
+  const [ldapProviders, setLdapProviders] = useState<LdapProvider[]>([])
+  const [ldapName, setLdapName] = useState('')
+  const [ldapUrl, setLdapUrl] = useState('ldap://directory.internal:389')
+  const [ldapBindDn, setLdapBindDn] = useState('')
+  const [ldapBindCredential, setLdapBindCredential] = useState('')
+  const [ldapUserSearchBase, setLdapUserSearchBase] = useState('')
+  const [ldapUserSearchFilter, setLdapUserSearchFilter] = useState('(uid={0})')
+  const [ldapUsernameAttribute, setLdapUsernameAttribute] = useState('uid')
+  const [ldapEmailAttribute, setLdapEmailAttribute] = useState('mail')
+  const [ldapSyncAttributesOnLogin, setLdapSyncAttributesOnLogin] = useState(true)
+  const [ldapDisableMissingUsers, setLdapDisableMissingUsers] = useState(false)
+  const [ldapEnabled, setLdapEnabled] = useState(true)
+  const [creatingLdapProvider, setCreatingLdapProvider] = useState(false)
+  const [oidcProviders, setOidcProviders] = useState<OidcBrokerProvider[]>([])
+  const [oidcAlias, setOidcAlias] = useState('')
+  const [oidcIssuerUrl, setOidcIssuerUrl] = useState('https://accounts.example.com')
+  const [oidcAuthorizationUrl, setOidcAuthorizationUrl] = useState('')
+  const [oidcTokenUrl, setOidcTokenUrl] = useState('')
+  const [oidcUserInfoUrl, setOidcUserInfoUrl] = useState('')
+  const [oidcJwksUrl, setOidcJwksUrl] = useState('')
+  const [oidcClientId, setOidcClientId] = useState('')
+  const [oidcClientSecret, setOidcClientSecret] = useState('')
+  const [oidcScopesInput, setOidcScopesInput] = useState('openid\nprofile\nemail')
+  const [oidcUsernameClaim, setOidcUsernameClaim] = useState('preferred_username')
+  const [oidcEmailClaim, setOidcEmailClaim] = useState('email')
+  const [oidcSyncAttributesOnLogin, setOidcSyncAttributesOnLogin] = useState(true)
+  const [oidcEnabled, setOidcEnabled] = useState(true)
+  const [creatingOidcProvider, setCreatingOidcProvider] = useState(false)
+  const [samlProviders, setSamlProviders] = useState<SamlBrokerProvider[]>([])
+  const [samlAlias, setSamlAlias] = useState('')
+  const [samlEntityId, setSamlEntityId] = useState('https://idp.example.com/metadata')
+  const [samlSsoUrl, setSamlSsoUrl] = useState('https://idp.example.com/sso')
+  const [samlSloUrl, setSamlSloUrl] = useState('')
+  const [samlCertificate, setSamlCertificate] = useState('')
+  const [samlNameIdFormat, setSamlNameIdFormat] = useState('urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress')
+  const [samlSyncAttributesOnLogin, setSamlSyncAttributesOnLogin] = useState(true)
+  const [samlWantAuthnRequestsSigned, setSamlWantAuthnRequestsSigned] = useState(false)
+  const [samlEnabled, setSamlEnabled] = useState(true)
+  const [creatingSamlProvider, setCreatingSamlProvider] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -184,8 +279,44 @@ export default function App() {
     }
   }
 
+  const loadLdapProviders = async (realmId: string) => {
+    const res = await fetch(`/admin/realms/${realmId}/federation/ldap`, { headers: authHeaders() })
+    if (!res.ok) {
+      setLdapProviders([])
+      return
+    }
+    setLdapProviders(await res.json())
+  }
+
+  const loadOidcProviders = async (realmId: string) => {
+    const res = await fetch(`/admin/realms/${realmId}/brokering/oidc`, { headers: authHeaders() })
+    if (!res.ok) {
+      setOidcProviders([])
+      return
+    }
+    setOidcProviders(await res.json())
+  }
+
+  const loadSamlProviders = async (realmId: string) => {
+    const res = await fetch(`/admin/realms/${realmId}/brokering/saml`, { headers: authHeaders() })
+    if (!res.ok) {
+      setSamlProviders([])
+      return
+    }
+    setSamlProviders(await res.json())
+  }
+
   const refreshSelectedRealm = async (realmId: string) => {
-    await Promise.all([loadUsers(realmId), loadClients(realmId), loadRoles(realmId), loadSessions(realmId), loadEvents(realmId)])
+    await Promise.all([
+      loadUsers(realmId),
+      loadClients(realmId),
+      loadRoles(realmId),
+      loadSessions(realmId),
+      loadEvents(realmId),
+      loadLdapProviders(realmId),
+      loadOidcProviders(realmId),
+      loadSamlProviders(realmId)
+    ])
   }
 
   const deleteSession = async (sessionId: string) => {
@@ -221,6 +352,9 @@ export default function App() {
       setLoginEvents([])
       setAdminEvents([])
       setEventsLoading(false)
+      setLdapProviders([])
+      setOidcProviders([])
+      setSamlProviders([])
       setFeedback(null, null)
     }
   }, [accessToken])
@@ -240,6 +374,9 @@ export default function App() {
       setLoginEvents([])
       setAdminEvents([])
       setEventsLoading(false)
+      setLdapProviders([])
+      setOidcProviders([])
+      setSamlProviders([])
     }
   }, [selectedRealmId])
 
@@ -305,6 +442,28 @@ export default function App() {
     }
     setPasswordInputs(prev => ({ ...prev, [userId]: '' }))
     setFeedback('Password updated.', null)
+  }
+
+  const detachFederation = async (userId: string) => {
+    if (!selectedRealmId) return
+    const pwd = passwordInputs[userId]
+    if (!pwd) {
+      setFeedback(null, 'Enter a local password before detaching this account.')
+      return
+    }
+    if (!window.confirm('Detach this externally managed account and convert it to a local account?')) return
+    const res = await fetch(`/admin/realms/${selectedRealmId}/users/${userId}/detach-federation`, {
+      method: 'POST',
+      headers: authHeaders(true),
+      body: JSON.stringify({ password: pwd })
+    })
+    if (!res.ok) {
+      setFeedback(null, 'Failed to detach external identity.')
+      return
+    }
+    setPasswordInputs(prev => ({ ...prev, [userId]: '' }))
+    await loadUsers(selectedRealmId)
+    setFeedback('External identity detached. User is now managed locally.', null)
   }
 
   const updateUser = async (userId: string) => {
@@ -451,6 +610,200 @@ export default function App() {
     setFeedback('Role deleted.', null)
   }
 
+  const createLdapProvider = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedRealmId) return
+    setCreatingLdapProvider(true)
+    setFeedback(null, null)
+    try {
+      const res = await fetch(`/admin/realms/${selectedRealmId}/federation/ldap`, {
+        method: 'POST',
+        headers: authHeaders(true),
+        body: JSON.stringify({
+          name: ldapName,
+          url: ldapUrl,
+          bindDn: ldapBindDn || undefined,
+          bindCredential: ldapBindCredential || undefined,
+          userSearchBase: ldapUserSearchBase || undefined,
+          userSearchFilter: ldapUserSearchFilter || undefined,
+          usernameAttribute: ldapUsernameAttribute || undefined,
+          emailAttribute: ldapEmailAttribute || undefined,
+          syncAttributesOnLogin: ldapSyncAttributesOnLogin,
+          disableMissingUsers: ldapDisableMissingUsers,
+          enabled: ldapEnabled
+        })
+      })
+      if (!res.ok) {
+        setFeedback(null, 'Failed to create LDAP provider.')
+        return
+      }
+      setLdapName('')
+      setLdapBindDn('')
+      setLdapBindCredential('')
+      setLdapUserSearchBase('')
+      setLdapUserSearchFilter('(uid={0})')
+      setLdapUsernameAttribute('uid')
+      setLdapEmailAttribute('mail')
+      setLdapSyncAttributesOnLogin(true)
+      setLdapDisableMissingUsers(false)
+      setLdapEnabled(true)
+      await loadLdapProviders(selectedRealmId)
+      setFeedback('LDAP provider created.', null)
+    } finally {
+      setCreatingLdapProvider(false)
+    }
+  }
+
+  const deleteLdapProvider = async (providerId: string) => {
+    if (!selectedRealmId) return
+    if (!window.confirm('Delete this LDAP provider?')) return
+    const res = await fetch(`/admin/realms/${selectedRealmId}/federation/ldap/${providerId}`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    })
+    if (!res.ok) {
+      setFeedback(null, 'Failed to delete LDAP provider.')
+      return
+    }
+    await loadLdapProviders(selectedRealmId)
+    setFeedback('LDAP provider deleted.', null)
+  }
+
+  const reconcileLdapProvider = async (providerId: string) => {
+    if (!selectedRealmId) return
+    const res = await fetch(`/admin/realms/${selectedRealmId}/federation/ldap/${providerId}/reconcile`, {
+      method: 'POST',
+      headers: authHeaders()
+    })
+    if (!res.ok) {
+      setFeedback(null, 'Failed to reconcile LDAP provider.')
+      return
+    }
+    const result = await res.json()
+    await loadUsers(selectedRealmId)
+    setFeedback(
+      `LDAP reconcile complete. Checked ${result.checkedUsers}, updated ${result.updatedUsers}, disabled ${result.disabledUsers}.`,
+      null
+    )
+  }
+
+  const createOidcProvider = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedRealmId) return
+    setCreatingOidcProvider(true)
+    setFeedback(null, null)
+    try {
+      const res = await fetch(`/admin/realms/${selectedRealmId}/brokering/oidc`, {
+        method: 'POST',
+        headers: authHeaders(true),
+        body: JSON.stringify({
+          alias: oidcAlias,
+          issuerUrl: oidcIssuerUrl,
+          authorizationUrl: oidcAuthorizationUrl || undefined,
+          tokenUrl: oidcTokenUrl || undefined,
+          userInfoUrl: oidcUserInfoUrl || undefined,
+          jwksUrl: oidcJwksUrl || undefined,
+          clientId: oidcClientId,
+          clientSecret: oidcClientSecret || undefined,
+          scopes: parseLines(oidcScopesInput),
+          usernameClaim: oidcUsernameClaim || undefined,
+          emailClaim: oidcEmailClaim || undefined,
+          syncAttributesOnLogin: oidcSyncAttributesOnLogin,
+          enabled: oidcEnabled
+        })
+      })
+      if (!res.ok) {
+        setFeedback(null, 'Failed to create OIDC broker provider.')
+        return
+      }
+      setOidcAlias('')
+      setOidcAuthorizationUrl('')
+      setOidcTokenUrl('')
+      setOidcUserInfoUrl('')
+      setOidcJwksUrl('')
+      setOidcClientId('')
+      setOidcClientSecret('')
+      setOidcScopesInput('openid\nprofile\nemail')
+      setOidcUsernameClaim('preferred_username')
+      setOidcEmailClaim('email')
+      setOidcSyncAttributesOnLogin(true)
+      setOidcEnabled(true)
+      await loadOidcProviders(selectedRealmId)
+      setFeedback('OIDC broker provider created.', null)
+    } finally {
+      setCreatingOidcProvider(false)
+    }
+  }
+
+  const deleteOidcProvider = async (providerId: string) => {
+    if (!selectedRealmId) return
+    if (!window.confirm('Delete this OIDC broker provider?')) return
+    const res = await fetch(`/admin/realms/${selectedRealmId}/brokering/oidc/${providerId}`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    })
+    if (!res.ok) {
+      setFeedback(null, 'Failed to delete OIDC broker provider.')
+      return
+    }
+    await loadOidcProviders(selectedRealmId)
+    setFeedback('OIDC broker provider deleted.', null)
+  }
+
+  const createSamlProvider = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedRealmId) return
+    setCreatingSamlProvider(true)
+    setFeedback(null, null)
+    try {
+      const res = await fetch(`/admin/realms/${selectedRealmId}/brokering/saml`, {
+        method: 'POST',
+        headers: authHeaders(true),
+        body: JSON.stringify({
+          alias: samlAlias,
+          entityId: samlEntityId,
+          ssoUrl: samlSsoUrl,
+          sloUrl: samlSloUrl || undefined,
+          x509Certificate: samlCertificate || undefined,
+          nameIdFormat: samlNameIdFormat || undefined,
+          syncAttributesOnLogin: samlSyncAttributesOnLogin,
+          wantAuthnRequestsSigned: samlWantAuthnRequestsSigned,
+          enabled: samlEnabled
+        })
+      })
+      if (!res.ok) {
+        setFeedback(null, 'Failed to create SAML provider.')
+        return
+      }
+      setSamlAlias('')
+      setSamlSloUrl('')
+      setSamlCertificate('')
+      setSamlNameIdFormat('urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress')
+      setSamlSyncAttributesOnLogin(true)
+      setSamlWantAuthnRequestsSigned(false)
+      setSamlEnabled(true)
+      await loadSamlProviders(selectedRealmId)
+      setFeedback('SAML provider created.', null)
+    } finally {
+      setCreatingSamlProvider(false)
+    }
+  }
+
+  const deleteSamlProvider = async (providerId: string) => {
+    if (!selectedRealmId) return
+    if (!window.confirm('Delete this SAML provider?')) return
+    const res = await fetch(`/admin/realms/${selectedRealmId}/brokering/saml/${providerId}`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    })
+    if (!res.ok) {
+      setFeedback(null, 'Failed to delete SAML provider.')
+      return
+    }
+    await loadSamlProviders(selectedRealmId)
+    setFeedback('SAML provider deleted.', null)
+  }
+
   return (
     <div style={{ padding: 24, fontFamily: 'system-ui, sans-serif' }}>
       <h1>OpenIdentity Admin Console</h1>
@@ -515,6 +868,7 @@ export default function App() {
                   <li key={u.id} style={{ marginBottom: 6 }}>
                     <div>
                       <strong>{u.username}</strong> {u.email ? `- ${u.email}` : ''} {u.enabled ? '(enabled)' : '(disabled)'}
+                      {u.federationSource ? ` [${u.federationSource}]` : ''}
                     </div>
                     <div style={{ marginTop: 4 }}>
                       <label>
@@ -524,8 +878,14 @@ export default function App() {
                           value={userEmailInputs[u.id] ?? ''}
                           onChange={e => setUserEmailInputs(prev => ({ ...prev, [u.id]: e.target.value }))}
                           style={{ marginLeft: 8 }}
+                          disabled={isExternallyManagedUser(u)}
                         />
                       </label>
+                      {isExternallyManagedUser(u) ? (
+                        <span style={{ marginLeft: 8 }}>
+                          {u.federationSource === 'ldap' ? 'Directory-managed profile' : 'Externally managed profile'}
+                        </span>
+                      ) : null}
                     </div>
                     <div style={{ marginTop: 4 }}>
                       <label>
@@ -537,18 +897,46 @@ export default function App() {
                           style={{ marginLeft: 8 }}
                         />
                       </label>
-                      <button onClick={() => updateUser(u.id)} style={{ marginLeft: 8 }}>Save</button>
+                      <button
+                        onClick={() => updateUser(u.id)}
+                        style={{ marginLeft: 8 }}
+                        disabled={isExternallyManagedUser(u)}
+                      >
+                        Save
+                      </button>
                       <button onClick={() => deleteUser(u.id)} style={{ marginLeft: 8 }}>Delete</button>
                     </div>
                     <div style={{ marginTop: 4 }}>
-                      <input
-                        type="password"
-                        placeholder="Set password"
-                        value={passwordInputs[u.id] ?? ''}
-                        onChange={e => setPasswordInputs(prev => ({ ...prev, [u.id]: e.target.value }))}
-                        style={{ marginRight: 8 }}
-                      />
-                      <button onClick={() => setPassword(u.id)} disabled={!passwordInputs[u.id]}>Set Password</button>
+                      {isExternallyManagedUser(u) ? (
+                        <>
+                          <span>
+                            Password is managed by {u.federationSource === 'ldap' ? 'LDAP' : 'the external identity provider'}.
+                          </span>
+                          <div style={{ marginTop: 6 }}>
+                            <input
+                              type="password"
+                              placeholder="Set local password to detach"
+                              value={passwordInputs[u.id] ?? ''}
+                              onChange={e => setPasswordInputs(prev => ({ ...prev, [u.id]: e.target.value }))}
+                              style={{ marginRight: 8 }}
+                            />
+                            <button onClick={() => detachFederation(u.id)} disabled={!passwordInputs[u.id]}>
+                              Detach To Local
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <input
+                            type="password"
+                            placeholder="Set password"
+                            value={passwordInputs[u.id] ?? ''}
+                            onChange={e => setPasswordInputs(prev => ({ ...prev, [u.id]: e.target.value }))}
+                            style={{ marginRight: 8 }}
+                          />
+                          <button onClick={() => setPassword(u.id)} disabled={!passwordInputs[u.id]}>Set Password</button>
+                        </>
+                      )}
                     </div>
                     <div style={{ marginTop: 8 }}>
                       <strong>Roles</strong>
@@ -786,6 +1174,383 @@ export default function App() {
                 )}
               </>
             )
+          ) : (
+            <p>No realm selected</p>
+          )}
+        </section>
+
+        <section style={{ flex: '1 1 360px' }}>
+          <h2>SAML Brokering</h2>
+          {selectedRealmId ? (
+            <>
+              {samlProviders.length === 0 ? (
+                <p>No SAML providers configured.</p>
+              ) : (
+                <ul>
+                  {samlProviders.map(provider => (
+                    <li key={provider.id} style={{ marginBottom: 10 }}>
+                      <div>
+                        <strong>{provider.alias}</strong> - {provider.entityId} {provider.enabled ? '(enabled)' : '(disabled)'}
+                      </div>
+                      <div>SSO URL: {provider.ssoUrl}</div>
+                      <div>SLO URL: {provider.sloUrl || 'unset'}</div>
+                      <div>NameID format: {provider.nameIdFormat || 'unset'}</div>
+                      <div>
+                        Sync attributes on login: {provider.syncAttributesOnLogin ? 'yes' : 'no'} | Want signed authn requests:{' '}
+                        {provider.wantAuthnRequestsSigned ? 'yes' : 'no'}
+                      </div>
+                      <div>Certificate configured: {provider.x509CertificateConfigured ? 'yes' : 'no'}</div>
+                      <button onClick={() => deleteSamlProvider(provider.id)} style={{ marginTop: 4 }}>Delete</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <h3 style={{ marginTop: 16 }}>Add SAML Provider</h3>
+              <form onSubmit={createSamlProvider}>
+                <div>
+                  <label>
+                    Alias:
+                    <input value={samlAlias} onChange={e => setSamlAlias(e.target.value)} required />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Entity ID:
+                    <input value={samlEntityId} onChange={e => setSamlEntityId(e.target.value)} required style={{ width: '100%' }} />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    SSO URL:
+                    <input value={samlSsoUrl} onChange={e => setSamlSsoUrl(e.target.value)} required style={{ width: '100%' }} />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    SLO URL:
+                    <input value={samlSloUrl} onChange={e => setSamlSloUrl(e.target.value)} style={{ width: '100%' }} />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    NameID Format:
+                    <input value={samlNameIdFormat} onChange={e => setSamlNameIdFormat(e.target.value)} style={{ width: '100%' }} />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    X.509 Certificate:
+                    <textarea
+                      value={samlCertificate}
+                      onChange={e => setSamlCertificate(e.target.value)}
+                      placeholder="Paste IdP signing certificate"
+                      style={{ width: '100%', minHeight: 96 }}
+                    />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Sync Attributes On Login:
+                    <input
+                      type="checkbox"
+                      checked={samlSyncAttributesOnLogin}
+                      onChange={e => setSamlSyncAttributesOnLogin(e.target.checked)}
+                    />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Want Authn Requests Signed:
+                    <input
+                      type="checkbox"
+                      checked={samlWantAuthnRequestsSigned}
+                      onChange={e => setSamlWantAuthnRequestsSigned(e.target.checked)}
+                    />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Enabled:
+                    <input type="checkbox" checked={samlEnabled} onChange={e => setSamlEnabled(e.target.checked)} />
+                  </label>
+                </div>
+                <button
+                  disabled={creatingSamlProvider || !samlAlias || !samlEntityId || !samlSsoUrl || !accessToken.trim()}
+                >
+                  Create
+                </button>
+              </form>
+            </>
+          ) : (
+            <p>No realm selected</p>
+          )}
+        </section>
+
+        <section style={{ flex: '1 1 360px' }}>
+          <h2>OIDC Brokering</h2>
+          {selectedRealmId ? (
+            <>
+              {oidcProviders.length === 0 ? (
+                <p>No OIDC broker providers configured.</p>
+              ) : (
+                <ul>
+                  {oidcProviders.map(provider => (
+                    <li key={provider.id} style={{ marginBottom: 10 }}>
+                      <div>
+                        <strong>{provider.alias}</strong> - {provider.issuerUrl} {provider.enabled ? '(enabled)' : '(disabled)'}
+                      </div>
+                      <div>Client ID: {provider.clientId}</div>
+                      <div>
+                        Endpoints: auth {provider.authorizationUrl || 'auto/unset'} | token {provider.tokenUrl || 'auto/unset'}
+                      </div>
+                      <div>
+                        UserInfo {provider.userInfoUrl || 'auto/unset'} | JWKS {provider.jwksUrl || 'auto/unset'}
+                      </div>
+                      <div>Scopes: {(provider.scopes ?? []).join(', ') || 'openid'}</div>
+                      <div>
+                        Claims: username {provider.usernameClaim || 'preferred_username'} | email {provider.emailClaim || 'email'}
+                      </div>
+                      <div>
+                        Sync attributes on login: {provider.syncAttributesOnLogin ? 'yes' : 'no'} | Client secret configured:{' '}
+                        {provider.clientSecretConfigured ? 'yes' : 'no'}
+                      </div>
+                      <button onClick={() => deleteOidcProvider(provider.id)} style={{ marginTop: 4 }}>Delete</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <h3 style={{ marginTop: 16 }}>Add OIDC Broker Provider</h3>
+              <form onSubmit={createOidcProvider}>
+                <div>
+                  <label>
+                    Alias:
+                    <input value={oidcAlias} onChange={e => setOidcAlias(e.target.value)} required />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Issuer URL:
+                    <input value={oidcIssuerUrl} onChange={e => setOidcIssuerUrl(e.target.value)} required style={{ width: '100%' }} />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Authorization URL:
+                    <input value={oidcAuthorizationUrl} onChange={e => setOidcAuthorizationUrl(e.target.value)} style={{ width: '100%' }} />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Token URL:
+                    <input value={oidcTokenUrl} onChange={e => setOidcTokenUrl(e.target.value)} style={{ width: '100%' }} />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    UserInfo URL:
+                    <input value={oidcUserInfoUrl} onChange={e => setOidcUserInfoUrl(e.target.value)} style={{ width: '100%' }} />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    JWKS URL:
+                    <input value={oidcJwksUrl} onChange={e => setOidcJwksUrl(e.target.value)} style={{ width: '100%' }} />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Client ID:
+                    <input value={oidcClientId} onChange={e => setOidcClientId(e.target.value)} required style={{ width: '100%' }} />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Client Secret:
+                    <input
+                      type="password"
+                      value={oidcClientSecret}
+                      onChange={e => setOidcClientSecret(e.target.value)}
+                      style={{ width: '100%' }}
+                    />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Scopes:
+                    <textarea
+                      value={oidcScopesInput}
+                      onChange={e => setOidcScopesInput(e.target.value)}
+                      placeholder="One scope per line"
+                      style={{ width: '100%', minHeight: 72 }}
+                    />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Username Claim:
+                    <input value={oidcUsernameClaim} onChange={e => setOidcUsernameClaim(e.target.value)} />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Email Claim:
+                    <input value={oidcEmailClaim} onChange={e => setOidcEmailClaim(e.target.value)} />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Sync Attributes On Login:
+                    <input
+                      type="checkbox"
+                      checked={oidcSyncAttributesOnLogin}
+                      onChange={e => setOidcSyncAttributesOnLogin(e.target.checked)}
+                    />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Enabled:
+                    <input type="checkbox" checked={oidcEnabled} onChange={e => setOidcEnabled(e.target.checked)} />
+                  </label>
+                </div>
+                <button
+                  disabled={creatingOidcProvider || !oidcAlias || !oidcIssuerUrl || !oidcClientId || !accessToken.trim()}
+                >
+                  Create
+                </button>
+              </form>
+            </>
+          ) : (
+            <p>No realm selected</p>
+          )}
+        </section>
+
+        <section style={{ flex: '1 1 360px' }}>
+          <h2>LDAP Federation</h2>
+          {selectedRealmId ? (
+            <>
+              {ldapProviders.length === 0 ? (
+                <p>No LDAP providers configured.</p>
+              ) : (
+                <ul>
+                  {ldapProviders.map(provider => (
+                    <li key={provider.id} style={{ marginBottom: 10 }}>
+                      <div>
+                        <strong>{provider.name}</strong> - {provider.url} {provider.enabled ? '(enabled)' : '(disabled)'}
+                      </div>
+                      <div>Bind DN: {provider.bindDn || 'anonymous or unset'}</div>
+                      <div>Search base: {provider.userSearchBase || 'unset'}</div>
+                      <div>Search filter: {provider.userSearchFilter || 'unset'}</div>
+                      <div>
+                        Username attr: {provider.usernameAttribute || 'uid'} | Email attr: {provider.emailAttribute || 'mail'}
+                      </div>
+                      <div>
+                        Sync attributes on login: {provider.syncAttributesOnLogin ? 'yes' : 'no'} | Disable missing users: {provider.disableMissingUsers ? 'yes' : 'no'}
+                      </div>
+                      <div>Bind credential configured: {provider.bindCredentialConfigured ? 'yes' : 'no'}</div>
+                      <button onClick={() => reconcileLdapProvider(provider.id)} style={{ marginTop: 4, marginRight: 8 }}>
+                        Reconcile
+                      </button>
+                      <button onClick={() => deleteLdapProvider(provider.id)} style={{ marginTop: 4 }}>Delete</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <h3 style={{ marginTop: 16 }}>Add LDAP Provider</h3>
+              <form onSubmit={createLdapProvider}>
+                <div>
+                  <label>
+                    Name:
+                    <input value={ldapName} onChange={e => setLdapName(e.target.value)} required />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    URL:
+                    <input value={ldapUrl} onChange={e => setLdapUrl(e.target.value)} required style={{ width: '100%' }} />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Bind DN:
+                    <input value={ldapBindDn} onChange={e => setLdapBindDn(e.target.value)} style={{ width: '100%' }} />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Bind Credential:
+                    <input
+                      type="password"
+                      value={ldapBindCredential}
+                      onChange={e => setLdapBindCredential(e.target.value)}
+                      style={{ width: '100%' }}
+                    />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    User Search Base:
+                    <input
+                      value={ldapUserSearchBase}
+                      onChange={e => setLdapUserSearchBase(e.target.value)}
+                      style={{ width: '100%' }}
+                    />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    User Search Filter:
+                    <input
+                      value={ldapUserSearchFilter}
+                      onChange={e => setLdapUserSearchFilter(e.target.value)}
+                      style={{ width: '100%' }}
+                    />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Username Attribute:
+                    <input value={ldapUsernameAttribute} onChange={e => setLdapUsernameAttribute(e.target.value)} />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Email Attribute:
+                    <input value={ldapEmailAttribute} onChange={e => setLdapEmailAttribute(e.target.value)} />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Sync Attributes On Login:
+                    <input
+                      type="checkbox"
+                      checked={ldapSyncAttributesOnLogin}
+                      onChange={e => setLdapSyncAttributesOnLogin(e.target.checked)}
+                    />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Disable Missing Users:
+                    <input
+                      type="checkbox"
+                      checked={ldapDisableMissingUsers}
+                      onChange={e => setLdapDisableMissingUsers(e.target.checked)}
+                    />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Enabled:
+                    <input type="checkbox" checked={ldapEnabled} onChange={e => setLdapEnabled(e.target.checked)} />
+                  </label>
+                </div>
+                <button disabled={creatingLdapProvider || !ldapName || !ldapUrl || !accessToken.trim()}>Create</button>
+              </form>
+            </>
           ) : (
             <p>No realm selected</p>
           )}

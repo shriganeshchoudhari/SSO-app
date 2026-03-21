@@ -1,0 +1,98 @@
+# Default values for openidentity.
+# Override per environment via -f values-prod.yaml
+
+replicaCount: 2
+
+image:
+  repository: openidentity/auth-server
+  pullPolicy: IfNotPresent
+  tag: ""  # defaults to .Chart.AppVersion
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 7070
+
+ingress:
+  enabled: true
+  className: "nginx"
+  host: "identity.example.com"
+  tls:
+    enabled: true
+    secretName: "openidentity-tls"
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+env:
+  HTTP_PORT: "7070"
+  DB_KIND: "postgresql"
+  SESSION_IDLE_TIMEOUT_SECONDS: "1800"
+
+# Reference an existing secret or let the chart create one.
+# If existingSecret is set the chart will not create a Secret resource.
+existingSecret: ""
+secrets:
+  DB_URL: "jdbc:postgresql://postgres:5432/openid"
+  DB_USERNAME: "postgres"
+  DB_PASSWORD: "change-me"
+  OPENIDENTITY_ADMIN_BOOTSTRAP_TOKEN: "change-me"
+  OPENIDENTITY_SECRET_PROTECTION_KEY: "change-me"
+  OPENIDENTITY_JWT_PRIVATE_KEY_PEM: ""
+  OPENIDENTITY_JWT_PUBLIC_KEY_PEM: ""
+
+livenessProbe:
+  httpGet:
+    path: /q/health/live
+    port: 7070
+  initialDelaySeconds: 30
+  periodSeconds: 15
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /q/health/ready
+    port: 7070
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  failureThreshold: 3
+
+serviceAccount:
+  create: true
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/path: "/q/metrics"
+  prometheus.io/port: "7070"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

@@ -1,38 +1,41 @@
-# Git ignore file for SSO-app
-# Ignore .git folder
-.git/
-# Ignore .gitignore file
-.gitignore
-# Ignore .DS_Store file
-.DS_Store
-# Ignore .idea folder
-.idea/  
-# Ignore .gitmodules file
-.gitmodules 
-# Java specific ignores
-*.class
-*.jar
-*.war
+# ── Java / Maven ─────────────────────────────────────────────────────────────
 auth-server/target/
 *.class
 *.jar
 *.war
 *.ear
-*.log
-hs_err_pid*
-replay_pid*
 
-# Ignore node_modules folder
+# ── Node / npm ────────────────────────────────────────────────────────────────
 node_modules/
-# Ignore .env file
-.env
-# Ignore common folders and files
-*.log
-*.db
-*.backup
+admin-ui/node_modules/
+account-ui/node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# ── Frontend build output ─────────────────────────────────────────────────────
+admin-ui/dist/
+account-ui/dist/
+admin-ui/.vite/
+account-ui/.vite/
+
+# ── IDE & OS ──────────────────────────────────────────────────────────────────
 .idea/
+*.iml
 .vscode/
-*.pyc
-# Ignore build and dist folders
-build/
-dist/
+.DS_Store
+Thumbs.db
+
+# ── Quarkus dev mode ──────────────────────────────────────────────────────────
+auth-server/.quarkus/
+auth-server/quarkus-app/
+
+# ── Generated OpenAPI / Swagger ───────────────────────────────────────────────
+openapi.json
+openapi.yaml
+
+# ── Environment / secrets ─────────────────────────────────────────────────────
+.env
+.env.local
+*.pem
+*.key
+*.p12

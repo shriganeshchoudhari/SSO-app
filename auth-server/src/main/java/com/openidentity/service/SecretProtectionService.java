@@ -41,6 +41,14 @@ public class SecretProtectionService {
   }
 
   public String protectTotpSecret(String secret) {
+    return protectOpaqueSecret(secret);
+  }
+
+  public String revealTotpSecret(String storedValue) {
+    return revealOpaqueSecret(storedValue);
+  }
+
+  public String protectOpaqueSecret(String secret) {
     if (secret == null || secret.isBlank()) {
       return secret;
     }
@@ -59,7 +67,7 @@ public class SecretProtectionService {
     }
   }
 
-  public String revealTotpSecret(String storedValue) {
+  public String revealOpaqueSecret(String storedValue) {
     if (storedValue == null || storedValue.isBlank()) {
       return storedValue;
     }

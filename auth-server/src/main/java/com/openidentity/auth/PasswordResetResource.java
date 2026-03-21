@@ -5,6 +5,7 @@ import com.openidentity.domain.PasswordResetTokenEntity;
 import com.openidentity.domain.RealmEntity;
 import com.openidentity.domain.UserEntity;
 import com.openidentity.service.EmailService;
+import com.openidentity.service.FederationPolicyService;
 import com.openidentity.service.SecurityTokenService;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -26,6 +27,7 @@ public class PasswordResetResource {
 
   @Inject EntityManager em;
   @Inject EmailService emailService;
+  @Inject FederationPolicyService federationPolicyService;
 
   @ConfigProperty(name = "openidentity.dev.return-tokens", defaultValue = "false")
   boolean returnTokens;
@@ -62,7 +64,7 @@ public class PasswordResetResource {
         .setParameter("rid", realm.getId())
         .setParameter("em", req.email.trim().toLowerCase())
         .getResultStream().findFirst().orElse(null);
-    if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
+    if (user == null || user.getEmail() == null || user.getEmail().isBlank() || federationPolicyService.isFederated(user)) {
       return Response.noContent().build();
     }
 
@@ -117,6 +119,7 @@ public class PasswordResetResource {
     }
 
     UserEntity u = prt.getUser();
+    federationPolicyService.ensureLocalPasswordAllowed(u);
     // Replace password credential
     em.createQuery("delete from CredentialEntity c where c.user.id = :uid and c.type = 'password'")
         .setParameter("uid", u.getId()).executeUpdate();
@@ -133,4 +136,3 @@ public class PasswordResetResource {
     return Response.noContent().build();
   }
 }
-

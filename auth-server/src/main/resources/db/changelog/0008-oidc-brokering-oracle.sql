@@ -1,0 +1,20 @@
+CREATE TABLE oidc_identity_provider (
+  id CHAR(36) PRIMARY KEY,
+  realm_id CHAR(36) NOT NULL,
+  alias VARCHAR2(255) NOT NULL,
+  issuer_url VARCHAR2(1024) NOT NULL,
+  authorization_url VARCHAR2(1024),
+  token_url VARCHAR2(1024),
+  user_info_url VARCHAR2(1024),
+  jwks_url VARCHAR2(1024),
+  client_id VARCHAR2(255) NOT NULL,
+  client_secret VARCHAR2(4000),
+  scopes_raw VARCHAR2(2000),
+  username_claim VARCHAR2(255),
+  email_claim VARCHAR2(255),
+  sync_attributes_on_login NUMBER(1) DEFAULT 1 NOT NULL,
+  enabled NUMBER(1) DEFAULT 1 NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_oidc_identity_provider_realm FOREIGN KEY (realm_id) REFERENCES realm(id) ON DELETE CASCADE,
+  CONSTRAINT uq_oidc_identity_provider UNIQUE (realm_id, alias)
+);
