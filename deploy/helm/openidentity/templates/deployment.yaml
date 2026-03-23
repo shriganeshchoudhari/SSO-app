@@ -13,45 +13,77 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 0
       maxSurge: 1
+      maxUnavailable: 0
   template:
     metadata:
       labels:
         {{- include "openidentity.selectorLabels" . | nindent 8 }}
+      {{- if .Values.metrics.enabled }}
       annotations:
-        {{- toYaml .Values.podAnnotations | nindent 8 }}
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
-        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/q/metrics"
+        prometheus.io/port: {{ .Values.config.httpPort | quote }}
+      {{- end }}
     spec:
-      serviceAccountName: {{ include "openidentity.serviceAccountName" . }}
       securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      terminationGracePeriodSeconds: 30
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       containers:
         - name: auth-server
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: {{ .Values.service.targetPort }}
-              protocol: TCP
+              containerPort: {{ .Values.config.httpPort | int }}
           envFrom:
             - configMapRef:
                 name: {{ include "openidentity.fullname" . }}-config
-            - secretRef:
-                name: {{ include "openidentity.secretName" . }}
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "openidentity.fullname" . }}-secrets
+                  key: DB_PASSWORD
+            - name: OPENIDENTITY_ADMIN_BOOTSTRAP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "openidentity.fullname" . }}-secrets
+                  key: OPENIDENTITY_ADMIN_BOOTSTRAP_TOKEN
+            - name: OPENIDENTITY_SECRET_PROTECTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "openidentity.fullname" . }}-secrets
+                  key: OPENIDENTITY_SECRET_PROTECTION_KEY
+            - name: OPENIDENTITY_JWT_PRIVATE_KEY_PEM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "openidentity.fullname" . }}-secrets
+                  key: OPENIDENTITY_JWT_PRIVATE_KEY_PEM
+            - name: OPENIDENTITY_JWT_PUBLIC_KEY_PEM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "openidentity.fullname" . }}-secrets
+                  key: OPENIDENTITY_JWT_PUBLIC_KEY_PEM
           livenessProbe:
-            {{- toYaml .Values.livenessProbe | nindent 12 }}
+            httpGet:
+              path: /q/health/live
+              port: {{ .Values.config.httpPort | int }}
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
           readinessProbe:
-            {{- toYaml .Values.readinessProbe | nindent 12 }}
+            httpGet:
+              path: /q/health/ready
+              port: {{ .Values.config.httpPort | int }}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          volumeMounts:
-            - name: tmp
-              mountPath: /tmp
-      volumes:
-        - name: tmp
-          emptyDir: {}
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

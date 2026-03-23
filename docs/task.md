@@ -33,7 +33,7 @@ This file tracks delivery status for the current product baseline and the phased
 | Client secret hardening | Complete | Client secrets are hashed before persistence | Existing client persistence |
 | TOTP secret hardening | Complete | TOTP secrets are protected at rest and revealed only for verification | Existing credential model |
 | Account/admin boundary cleanup | Complete | Account UI now uses self-service `/account` endpoints with bearer token context | Existing account UI |
-| Repository hygiene for tracked generated artifacts | Planned | Build/test artifacts still create repo noise | Current repo state |
+| Repository hygiene for tracked generated artifacts | Complete | .gitignore updated — target/, dist/, node_modules/, generated OpenAPI excluded | Current repo state |
 
 ## Phase 2: OIDC Core Compliance
 
@@ -44,7 +44,7 @@ This file tracks delivery status for the current product baseline and the phased
 | Redirect URI validation | Complete | Registered redirect URIs are stored on clients and enforced on authorize/code exchange | Phase 1 hardening |
 | Client grant-type controls | Complete | Clients now carry allowed grant types enforced at token/authorize endpoints | Phase 1 hardening |
 | Discovery document alignment | Complete | Discovery now advertises authorize, token, revoke, PKCE, and RS256 signing metadata | Phase 1 hardening |
-| Production-grade JWKS/key distribution model | In Progress | RS256 signing and JWKS certs now exist; key persistence/rotation hardening still remains | Phase 1 hardening |
+| Production-grade JWKS/key distribution model | Complete | SigningKeyEntity persists keys to DB encrypted at rest; JwtKeyService loads/rotates from DB; JwksResource serves active + grace-window retired keys; POST /admin/keys/rotate added | Phase 1 hardening |
 
 ## Phase 3: Productized Admin and Account Experience
 
@@ -64,7 +64,7 @@ This file tracks delivery status for the current product baseline and the phased
 | LDAP/AD federation | In Progress | Persisted LDAP provider configuration, admin CRUD/UI management, password-grant fallback with local user provisioning, LDAP-managed read-only password/profile policy, provider-controlled login-time sync/disable-missing behavior, and scheduled/manual provider reconciliation now exist; broader lifecycle reconciliation still remains | Phase 1-3 baseline |
 | OIDC/SAML brokering | In Progress | OIDC broker provider configuration, persistence, admin CRUD/UI management, broker start/callback flow, external code exchange, local user linking, read-only managed-user policy, admin detachment back to local accounts, local authorization-code handoff, and SAML provider/browser-flow validation now exist; SAML SP metadata, signed AuthnRequest support, and both SP-initiated and IdP-initiated logout flow groundwork now exist as well, including signed logout responses when signed SP messages are enabled, but broader broker lifecycle still remains | Phase 1-3 baseline |
 | SAML support | In Progress | SAML identity provider persistence, admin CRUD/UI groundwork, SP metadata with signing key publication and SingleLogoutService, AuthnRequest initiation, optional AuthnRequest XML signing, ACS handling, request-bound issuer/audience/destination/time validation, certificate-backed XML signature verification, SP-initiated logout initiation/callback flow, IdP-initiated logout request handling/response, signed logout responses when signed SP messages are enabled, and local user linking now exist; broader production hardening still remains | Phase 1-3 baseline |
-| Tenant/organization policy groundwork | Not Started | No implementation in repo | Phase 1-3 baseline |
+| Tenant/organization policy groundwork | In Progress | OrganizationEntity + OrganizationMemberEntity, DB migrations (0015, all 5 DBs), AdminOrganizationsResource (full CRUD + member management at /admin/realms/{id}/organizations) added; delegated admin, per-org branding, and policy engine remain | Phase 1-3 baseline |
 | SCIM provisioning | Not Started | No implementation in repo | Phase 1-3 baseline |
 
 ## Phase 5: Operations, HA, and Production Readiness
@@ -72,10 +72,10 @@ This file tracks delivery status for the current product baseline and the phased
 | Task | Status | Note | Dependency |
 | --- | --- | --- | --- |
 | Current CI pipeline | Complete | Build/test/audit/CodeQL workflow exists | - |
-| Production deployment assets | Not Started | No committed Docker/K8s/Helm assets | Earlier product phases |
-| Metrics/tracing/operational observability | In Progress | `/q/health` and `/q/metrics` now exist with readiness checks for JWT signing/secret protection plus app counters for token and broker flows; tracing, alerting, and broader operational dashboards still remain | Earlier product phases |
+| Production deployment assets | Complete | Dockerfile (multi-stage), docker-compose.yml, K8s manifests (namespace/secret/configmap/deployment/service/ingress/postgres/hpa), Helm chart (openidentity) added under deploy/ | Earlier product phases |
+| Metrics/tracing/operational observability | In Progress | ObservabilityService expanded: login/logout/introspect/admin-action counters, active-session gauge, key-age gauge, grant latency timer; ObservabilityRefreshJob refreshes gauges every 60s; Grafana dashboard added at deploy/grafana/dashboard.json; distributed tracing still remains | Earlier product phases |
 | Shared session/rate-limit state | Not Started | No HA/shared-state infra model yet | Earlier product phases |
-| Backup/restore runbooks | Not Started | Not documented in repo | Earlier product phases |
+| Backup/restore runbooks | Complete | docs/RUNBOOK_BACKUP_RESTORE.md added — covers pg_dump/restore, signing key backup/recovery, Liquibase rollback, and RTO/RPO targets | Earlier product phases |
 | Release quality gates beyond current CI | Not Started | Future operational maturity work | Earlier product phases |
 
 ## Master Catalog Epics

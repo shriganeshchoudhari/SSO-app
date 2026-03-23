@@ -1,0 +1,233 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "OpenIdentity Prometheus datasource",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "__requires": [
+    { "type": "grafana",    "id": "grafana",    "name": "Grafana",    "version": "10.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" },
+    { "type": "panel",      "id": "timeseries", "name": "Time series","version": "" },
+    { "type": "panel",      "id": "stat",       "name": "Stat",       "version": "" },
+    { "type": "panel",      "id": "gauge",      "name": "Gauge",      "version": "" }
+  ],
+  "title": "OpenIdentity Overview",
+  "uid": "openidentity-overview",
+  "tags": ["openidentity", "iam", "sso"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Active sessions",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "uid": "${DS_PROMETHEUS}" },
+      "targets": [{
+        "expr": "openidentity_session_active",
+        "legendFormat": "sessions"
+      }],
+      "options": { "colorMode": "background", "graphMode": "area", "textMode": "auto" }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Token grants / min",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "uid": "${DS_PROMETHEUS}" },
+      "targets": [{
+        "expr": "sum(rate(openidentity_token_grant_total[1m])) * 60",
+        "legendFormat": "grants/min"
+      }],
+      "options": { "colorMode": "background", "graphMode": "area" }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Login failures / min",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "uid": "${DS_PROMETHEUS}" },
+      "targets": [{
+        "expr": "sum(rate(openidentity_auth_login_total{outcome=\"failure\"}[1m])) * 60",
+        "legendFormat": "failures/min"
+      }],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 5 },
+            { "color": "red", "value": 20 }
+          ]
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "gauge",
+      "title": "Signing key age (hours)",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "uid": "${DS_PROMETHEUS}" },
+      "targets": [{
+        "expr": "openidentity_key_age_hours",
+        "legendFormat": "hours"
+      }],
+      "options": {
+        "minValue": 0,
+        "maxValue": 2160,
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "green",  "value": null },
+            { "color": "yellow", "value": 1440 },
+            { "color": "red",    "value": 2160 }
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h",
+          "thresholds": {
+            "steps": [
+              { "color": "green",  "value": null },
+              { "color": "yellow", "value": 1440 },
+              { "color": "red",    "value": 2160 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "App readiness",
+      "gridPos": { "x": 16, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "uid": "${DS_PROMETHEUS}" },
+      "targets": [{
+        "expr": "quarkus_application_info",
+        "legendFormat": "up"
+      }],
+      "options": { "colorMode": "background" }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Token grants by type",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "uid": "${DS_PROMETHEUS}" },
+      "targets": [{
+        "expr": "sum by (grant_type) (rate(openidentity_token_grant_total[2m])) * 60",
+        "legendFormat": "{{grant_type}}"
+      }],
+      "options": { "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "unit": "reqpm" } }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Token grant outcomes (success vs failure)",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "uid": "${DS_PROMETHEUS}" },
+      "targets": [{
+        "expr": "sum by (outcome) (rate(openidentity_token_grant_total[2m])) * 60",
+        "legendFormat": "{{outcome}}"
+      }],
+      "options": { "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "unit": "reqpm" } }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Login outcomes by realm",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "uid": "${DS_PROMETHEUS}" },
+      "targets": [{
+        "expr": "sum by (realm, outcome) (rate(openidentity_auth_login_total[2m])) * 60",
+        "legendFormat": "{{realm}} / {{outcome}}"
+      }],
+      "fieldConfig": { "defaults": { "unit": "reqpm" } }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Broker flow events",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "uid": "${DS_PROMETHEUS}" },
+      "targets": [{
+        "expr": "sum by (protocol, step, outcome) (rate(openidentity_broker_flow_total[2m])) * 60",
+        "legendFormat": "{{protocol}} / {{step}} / {{outcome}}"
+      }],
+      "fieldConfig": { "defaults": { "unit": "reqpm" } }
+    },
+    {
+      "id": 30,
+      "type": "timeseries",
+      "title": "Token grant p99 latency",
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "datasource": { "uid": "${DS_PROMETHEUS}" },
+      "targets": [{
+        "expr": "histogram_quantile(0.99, sum by (grant_type, le) (rate(openidentity_token_grant_latency_seconds_bucket[2m])))",
+        "legendFormat": "p99 {{grant_type}}"
+      }],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "HTTP request rate (all endpoints)",
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "datasource": { "uid": "${DS_PROMETHEUS}" },
+      "targets": [{
+        "expr": "sum by (method, uri) (rate(http_server_requests_seconds_count[2m])) * 60",
+        "legendFormat": "{{method}} {{uri}}"
+      }],
+      "fieldConfig": { "defaults": { "unit": "reqpm" } }
+    },
+    {
+      "id": 40,
+      "type": "timeseries",
+      "title": "JVM heap used",
+      "gridPos": { "x": 0, "y": 28, "w": 8, "h": 6 },
+      "datasource": { "uid": "${DS_PROMETHEUS}" },
+      "targets": [{
+        "expr": "jvm_memory_used_bytes{area=\"heap\"}",
+        "legendFormat": "heap used"
+      }],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "id": 41,
+      "type": "timeseries",
+      "title": "JVM CPU usage",
+      "gridPos": { "x": 8, "y": 28, "w": 8, "h": 6 },
+      "datasource": { "uid": "${DS_PROMETHEUS}" },
+      "targets": [{
+        "expr": "process_cpu_usage",
+        "legendFormat": "cpu"
+      }],
+      "fieldConfig": { "defaults": { "unit": "percentunit" } }
+    },
+    {
+      "id": 42,
+      "type": "timeseries",
+      "title": "Admin actions by resource",
+      "gridPos": { "x": 16, "y": 28, "w": 8, "h": 6 },
+      "datasource": { "uid": "${DS_PROMETHEUS}" },
+      "targets": [{
+        "expr": "sum by (resource, action) (rate(openidentity_admin_action_total[2m])) * 60",
+        "legendFormat": "{{resource}} / {{action}}"
+      }],
+      "fieldConfig": { "defaults": { "unit": "reqpm" } }
+    }
+  ]
+}

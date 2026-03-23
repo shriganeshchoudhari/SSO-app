@@ -459,4 +459,74 @@
         </preConditions>
         <sqlFile relativeToChangelogFile="true" path="0013-saml-single-logout-oracle.sql" endDelimiter=";" splitStatements="true" />
     </changeSet>
+
+    <changeSet id="0014-signing-keys-postgresql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0014-signing-keys.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0014-signing-keys-h2" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="h2"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0014-signing-keys-h2.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0014-signing-keys-mysql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mysql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0014-signing-keys-mysql.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0014-signing-keys-mariadb" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mariadb"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0014-signing-keys-mariadb.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0014-signing-keys-oracle" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="oracle"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0014-signing-keys-oracle.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0015-organizations-postgresql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0015-organizations.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0015-organizations-h2" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="h2"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0015-organizations-h2.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0015-organizations-mysql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mysql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0015-organizations-mysql.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0015-organizations-mariadb" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mariadb"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0015-organizations-mariadb.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0015-organizations-oracle" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="oracle"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0015-organizations-oracle.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
 </databaseChangeLog>

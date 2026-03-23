@@ -9,18 +9,14 @@ Expand the name of the chart.
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+{{- printf "%s-%s" .Release.Name (include "openidentity.name" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}
-{{- end }}
-
-{{- define "openidentity.chart" -}}
-{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{- define "openidentity.labels" -}}
-helm.sh/chart: {{ include "openidentity.chart" . }}
-{{ include "openidentity.selectorLabels" . }}
+helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+app.kubernetes.io/name: {{ include "openidentity.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
@@ -28,20 +24,4 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- define "openidentity.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "openidentity.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
-{{- end }}
-
-{{- define "openidentity.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "openidentity.fullname" .) .Values.serviceAccount.name }}
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
-{{- end }}
-{{- end }}
-
-{{- define "openidentity.secretName" -}}
-{{- if .Values.existingSecret }}
-{{- .Values.existingSecret }}
-{{- else }}
-{{- include "openidentity.fullname" . }}-secrets
-{{- end }}
 {{- end }}

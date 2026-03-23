@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openidentity-config
+  namespace: openidentity
+data:
+  DB_KIND: "postgresql"
+  DB_URL: "jdbc:postgresql://openidentity-postgres:5432/openid"
+  DB_USERNAME: "postgres"
+  HTTP_PORT: "7070"
+  SESSION_IDLE_TIMEOUT_SECONDS: "1800"

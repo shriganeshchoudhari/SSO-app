@@ -1,15 +1,14 @@
 apiVersion: v2
 name: openidentity
-description: OpenIdentity IAM/SSO platform — auth server Helm chart
+description: OpenIdentity IAM / SSO platform
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
 keywords:
-  - identity
-  - sso
   - iam
+  - sso
+  - oauth2
   - oidc
-  - saml
 home: https://github.com/your-org/openidentity
 maintainers:
   - name: OpenIdentity Team

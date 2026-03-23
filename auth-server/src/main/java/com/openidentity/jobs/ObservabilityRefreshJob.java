@@ -4,20 +4,22 @@ import com.openidentity.service.ObservabilityService;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.transaction.Transactional;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
- * Periodically refreshes DB-backed Micrometer gauges (active sessions,
- * signing key age) so they stay current without blocking request threads.
+ * Periodically refreshes long-lived Micrometer gauges (active sessions, signing key age)
+ * that require a DB query and cannot be computed lazily on each scrape.
  */
 @ApplicationScoped
 public class ObservabilityRefreshJob {
 
   @Inject ObservabilityService observabilityService;
 
-  @Scheduled(every = "60s", delayed = "15s")
-  @Transactional
+  @ConfigProperty(name = "session.idle-timeout-seconds", defaultValue = "1800")
+  long idleTimeoutSeconds;
+
+  @Scheduled(every = "60s")
   void refresh() {
-    observabilityService.refreshGauges();
+    observabilityService.refreshGauges(idleTimeoutSeconds);
   }
 }

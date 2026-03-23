@@ -1,0 +1,116 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openidentity-auth
+  namespace: openidentity
+  labels:
+    app: openidentity-auth
+    app.kubernetes.io/name: openidentity
+    app.kubernetes.io/component: auth-server
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: openidentity-auth
+  template:
+    metadata:
+      labels:
+        app: openidentity-auth
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/q/metrics"
+        prometheus.io/port: "7070"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: auth-server
+          image: openidentity/auth-server:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 7070
+              name: http
+          envFrom:
+            - configMapRef:
+                name: openidentity-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: openidentity-secrets
+                  key: DB_PASSWORD
+            - name: OPENIDENTITY_ADMIN_BOOTSTRAP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: openidentity-secrets
+                  key: OPENIDENTITY_ADMIN_BOOTSTRAP_TOKEN
+            - name: OPENIDENTITY_SECRET_PROTECTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openidentity-secrets
+                  key: OPENIDENTITY_SECRET_PROTECTION_KEY
+            - name: OPENIDENTITY_JWT_PRIVATE_KEY_PEM
+              valueFrom:
+                secretKeyRef:
+                  name: openidentity-secrets
+                  key: OPENIDENTITY_JWT_PRIVATE_KEY_PEM
+            - name: OPENIDENTITY_JWT_PUBLIC_KEY_PEM
+              valueFrom:
+                secretKeyRef:
+                  name: openidentity-secrets
+                  key: OPENIDENTITY_JWT_PUBLIC_KEY_PEM
+          readinessProbe:
+            httpGet:
+              path: /q/health/ready
+              port: 7070
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /q/health/live
+              port: 7070
+            initialDelaySeconds: 40
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openidentity-auth-svc
+  namespace: openidentity
+  labels:
+    app: openidentity-auth
+spec:
+  selector:
+    app: openidentity-auth
+  ports:
+    - name: http
+      port: 80
+      targetPort: 7070
+  type: ClusterIP
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: openidentity-auth-pdb
+  namespace: openidentity
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: openidentity-auth

@@ -6,6 +6,8 @@ metadata:
   labels:
     {{- include "openidentity.labels" . | nindent 4 }}
 data:
-  {{- range $k, $v := .Values.env }}
-  {{ $k }}: {{ $v | quote }}
-  {{- end }}
+  DB_KIND: "postgresql"
+  DB_URL: "jdbc:postgresql://{{ include "openidentity.fullname" . }}-postgres:5432/{{ .Values.postgres.database }}"
+  DB_USERNAME: {{ .Values.postgres.username | quote }}
+  HTTP_PORT: {{ .Values.config.httpPort | quote }}
+  SESSION_IDLE_TIMEOUT_SECONDS: {{ .Values.config.sessionIdleTimeoutSeconds | quote }}
