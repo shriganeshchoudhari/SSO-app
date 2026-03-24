@@ -68,6 +68,7 @@ jobs:
         env:
           SMALLRYE_JWT_SIGN_KEY: 0123456789abcdef0123456789abcdef
           SMALLRYE_JWT_SIGN_KEY_ALGORITHM: HS256
+          OPENIDENTITY_SECRET_PROTECTION_KEY: ci-test-secret-protection-key-32x
       - name: Test (PostgreSQL)
         if: matrix.db == 'postgres'
         run: |
@@ -77,7 +78,8 @@ jobs:
             -Dquarkus.datasource.username=postgres \
             -Dquarkus.datasource.password=postgres \
             -Dsmallrye.jwt.sign.key=0123456789abcdef0123456789abcdef \
-            -Dsmallrye.jwt.sign.key.algorithm=HS256
+            -Dsmallrye.jwt.sign.key.algorithm=HS256 \
+            -Dopenidentity.secret-protection.key=ci-test-secret-protection-key-32x
         working-directory: auth-server
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

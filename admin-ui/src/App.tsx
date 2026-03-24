@@ -87,6 +87,30 @@ type SamlBrokerProvider = {
   enabled?: boolean
   x509CertificateConfigured?: boolean
 }
+type Organization = {
+  id: string
+  realmId: string
+  name: string
+  displayName?: string | null
+  enabled?: boolean
+  createdAt?: string
+}
+type OrgMember = {
+  id: string
+  organizationId: string
+  userId: string
+  orgRole: string
+  joinedAt?: string
+}
+type SigningKey = {
+  id: string
+  kid: string
+  algorithm: string
+  status: 'active' | 'retired'
+  createdAt: string
+  retiredAt?: string
+  withinGrace?: boolean
+}
 
 const parseLines = (value: string) =>
   value
@@ -173,7 +197,107 @@ export default function App() {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // ── Organizations state ────────────────────────────────────────────────────
+  const [organizations, setOrganizations] = useState<Organization[]>([])
+  const [orgName, setOrgName] = useState('')
+  const [orgDisplayName, setOrgDisplayName] = useState('')
+  const [creatingOrg, setCreatingOrg] = useState(false)
+  const [expandedOrgId, setExpandedOrgId] = useState<string | null>(null)
+  const [orgMembers, setOrgMembers] = useState<Record<string, OrgMember[]>>({})
+  const [addMemberUserId, setAddMemberUserId] = useState<Record<string, string>>({})
+  const [addMemberRole, setAddMemberRole] = useState<Record<string, string>>({})
+
+  // ── Signing Keys state ─────────────────────────────────────────────────────
+  const [signingKeys, setSigningKeys] = useState<SigningKey[]>([])
+  const [keysLoading, setKeysLoading] = useState(false)
+  const [rotating, setRotating] = useState(false)
+
   const selectedRealm = useMemo(() => realms.find(r => r.id === selectedRealmId) || null, [realms, selectedRealmId])
+
+  // ── Organizations loaders ─────────────────────────────────────────────────
+  const loadOrganizations = async (realmId: string) => {
+    const res = await fetch(`/admin/realms/${realmId}/organizations`, { headers: authHeaders() })
+    if (!res.ok) { setOrganizations([]); return }
+    setOrganizations(await res.json())
+  }
+
+  const loadOrgMembers = async (realmId: string, orgId: string) => {
+    const res = await fetch(`/admin/realms/${realmId}/organizations/${orgId}/members`, { headers: authHeaders() })
+    if (!res.ok) return
+    const members: OrgMember[] = await res.json()
+    setOrgMembers(prev => ({ ...prev, [orgId]: members }))
+  }
+
+  const createOrg = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedRealmId || !orgName.trim()) return
+    setCreatingOrg(true)
+    try {
+      const res = await fetch(`/admin/realms/${selectedRealmId}/organizations`, {
+        method: 'POST', headers: authHeaders(true),
+        body: JSON.stringify({ name: orgName.trim(), displayName: orgDisplayName.trim() || undefined })
+      })
+      if (!res.ok) { setFeedback(null, 'Failed to create organization.'); return }
+      setOrgName(''); setOrgDisplayName('')
+      await loadOrganizations(selectedRealmId)
+      setFeedback('Organization created.', null)
+    } finally { setCreatingOrg(false) }
+  }
+
+  const deleteOrg = async (orgId: string) => {
+    if (!selectedRealmId || !window.confirm('Delete this organization?')) return
+    const res = await fetch(`/admin/realms/${selectedRealmId}/organizations/${orgId}`,
+      { method: 'DELETE', headers: authHeaders() })
+    if (!res.ok) { setFeedback(null, 'Failed to delete organization.'); return }
+    await loadOrganizations(selectedRealmId)
+    setFeedback('Organization deleted.', null)
+  }
+
+  const addOrgMember = async (orgId: string) => {
+    if (!selectedRealmId) return
+    const userId = (addMemberUserId[orgId] ?? '').trim()
+    const role = (addMemberRole[orgId] ?? 'member').trim()
+    if (!userId) return
+    const res = await fetch(`/admin/realms/${selectedRealmId}/organizations/${orgId}/members`, {
+      method: 'POST', headers: authHeaders(true),
+      body: JSON.stringify({ userId, orgRole: role })
+    })
+    if (!res.ok) { setFeedback(null, 'Failed to add member.'); return }
+    setAddMemberUserId(prev => ({ ...prev, [orgId]: '' }))
+    await loadOrgMembers(selectedRealmId, orgId)
+    setFeedback('Member added.', null)
+  }
+
+  const removeOrgMember = async (orgId: string, memberId: string) => {
+    if (!selectedRealmId || !window.confirm('Remove this member?')) return
+    const res = await fetch(
+      `/admin/realms/${selectedRealmId}/organizations/${orgId}/members/${memberId}`,
+      { method: 'DELETE', headers: authHeaders() })
+    if (!res.ok) { setFeedback(null, 'Failed to remove member.'); return }
+    await loadOrgMembers(selectedRealmId, orgId)
+    setFeedback('Member removed.', null)
+  }
+
+  // ── Signing Keys loaders ──────────────────────────────────────────────────
+  const loadSigningKeys = async () => {
+    setKeysLoading(true)
+    try {
+      const res = await fetch('/admin/keys', { headers: authHeaders() })
+      if (!res.ok) { setSigningKeys([]); return }
+      setSigningKeys(await res.json())
+    } finally { setKeysLoading(false) }
+  }
+
+  const rotateKey = async () => {
+    if (!window.confirm('Rotate the active signing key? Existing tokens remain valid during the 24-hour grace window.')) return
+    setRotating(true)
+    try {
+      const res = await fetch('/admin/keys/rotate', { method: 'POST', headers: authHeaders() })
+      if (!res.ok) { setFeedback(null, 'Key rotation failed.'); return }
+      await loadSigningKeys()
+      setFeedback('Signing key rotated successfully.', null)
+    } finally { setRotating(false) }
+  }
 
   const authHeaders = (json = false) => ({
     Authorization: `Bearer ${accessToken.trim()}`,
@@ -1554,6 +1678,141 @@ export default function App() {
           ) : (
             <p>No realm selected</p>
           )}
+        </section>
+
+        {/* ── Organizations ──────────────────────────────────────────────── */}
+        <section>
+          <h2>Organizations</h2>
+          {selectedRealmId ? (
+            <>
+              <button onClick={() => loadOrganizations(selectedRealmId)} disabled={!accessToken.trim()}>Load organizations</button>
+              {organizations.length > 0 && (
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12 }}>
+                  <thead><tr style={{ background: '#f5f5f5' }}>
+                    <th style={{ padding: '6px 8px', textAlign: 'left' }}>Name</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'left' }}>Display name</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'left' }}>Enabled</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'left' }}>Members</th>
+                    <th style={{ padding: '6px 8px' }}></th>
+                  </tr></thead>
+                  <tbody>
+                    {organizations.map(org => (
+                      <React.Fragment key={org.id}>
+                        <tr style={{ borderBottom: '1px solid #eee' }}>
+                          <td style={{ padding: '6px 8px' }}><strong>{org.name}</strong></td>
+                          <td style={{ padding: '6px 8px' }}>{org.displayName ?? '—'}</td>
+                          <td style={{ padding: '6px 8px' }}>{org.enabled ? 'Yes' : 'No'}</td>
+                          <td style={{ padding: '6px 8px' }}>
+                            <button onClick={() => {
+                              const isOpen = expandedOrgId === org.id
+                              setExpandedOrgId(isOpen ? null : org.id)
+                              if (!isOpen) loadOrgMembers(selectedRealmId, org.id)
+                            }}>
+                              {expandedOrgId === org.id ? 'Hide members' : 'Members'}
+                            </button>
+                          </td>
+                          <td style={{ padding: '6px 8px' }}>
+                            <button onClick={() => deleteOrg(org.id)} style={{ color: 'red' }}>Delete</button>
+                          </td>
+                        </tr>
+                        {expandedOrgId === org.id && (
+                          <tr><td colSpan={5} style={{ padding: '8px 16px', background: '#fafafa' }}>
+                            <strong>Members</strong>
+                            {(orgMembers[org.id] ?? []).length === 0
+                              ? <p>No members.</p>
+                              : <ul>{(orgMembers[org.id] ?? []).map(m => (
+                                  <li key={m.id}>
+                                    {m.userId} &mdash; <em>{m.orgRole}</em>{' '}
+                                    <button onClick={() => removeOrgMember(org.id, m.id)}>Remove</button>
+                                  </li>
+                                ))}</ul>}
+                            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                              <input
+                                placeholder="User ID"
+                                value={addMemberUserId[org.id] ?? ''}
+                                onChange={e => setAddMemberUserId(prev => ({ ...prev, [org.id]: e.target.value }))}
+                              />
+                              <select
+                                value={addMemberRole[org.id] ?? 'member'}
+                                onChange={e => setAddMemberRole(prev => ({ ...prev, [org.id]: e.target.value }))}
+                              >
+                                <option value="member">member</option>
+                                <option value="admin">admin</option>
+                              </select>
+                              <button onClick={() => addOrgMember(org.id)}>Add member</button>
+                            </div>
+                          </td></tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              <h3>Create organization</h3>
+              <form onSubmit={createOrg} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <label>Name
+                  <input value={orgName} onChange={e => setOrgName(e.target.value)} required />
+                </label>
+                <label>Display name
+                  <input value={orgDisplayName} onChange={e => setOrgDisplayName(e.target.value)} />
+                </label>
+                <button type="submit" disabled={creatingOrg || !orgName.trim() || !accessToken.trim()}>Create</button>
+              </form>
+            </>
+          ) : (<p>No realm selected</p>)}
+        </section>
+
+        {/* ── Signing Keys ───────────────────────────────────────────────── */}
+        <section>
+          <h2>JWT signing keys</h2>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <button onClick={loadSigningKeys} disabled={keysLoading || !accessToken.trim()}>
+              {keysLoading ? 'Loading…' : 'Load keys'}
+            </button>
+            <button
+              onClick={rotateKey}
+              disabled={rotating || !accessToken.trim()}
+              style={{ background: '#dc3545', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 12px', cursor: 'pointer' }}
+            >
+              {rotating ? 'Rotating…' : 'Rotate active key'}
+            </button>
+          </div>
+          {signingKeys.length > 0 && (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr style={{ background: '#f5f5f5' }}>
+                <th style={{ padding: '6px 8px', textAlign: 'left' }}>Kid</th>
+                <th style={{ padding: '6px 8px', textAlign: 'left' }}>Algorithm</th>
+                <th style={{ padding: '6px 8px', textAlign: 'left' }}>Status</th>
+                <th style={{ padding: '6px 8px', textAlign: 'left' }}>Created</th>
+                <th style={{ padding: '6px 8px', textAlign: 'left' }}>Retired</th>
+              </tr></thead>
+              <tbody>
+                {signingKeys.map(k => (
+                  <tr key={k.id} style={{ borderBottom: '1px solid #eee',
+                    background: k.status === 'active' ? '#f0fff0' :
+                      k.withinGrace ? '#fffbea' : '#fff' }}>
+                    <td style={{ padding: '6px 8px', fontFamily: 'monospace', fontSize: 13 }}>{k.kid}</td>
+                    <td style={{ padding: '6px 8px' }}>{k.algorithm}</td>
+                    <td style={{ padding: '6px 8px' }}>
+                      <span style={{
+                        display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 12,
+                        background: k.status === 'active' ? '#d4edda' : k.withinGrace ? '#fff3cd' : '#e2e3e5',
+                        color: k.status === 'active' ? '#155724' : k.withinGrace ? '#856404' : '#6c757d'
+                      }}>
+                        {k.status === 'active' ? 'Active' : k.withinGrace ? 'Retired (grace)' : 'Retired'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '6px 8px', fontSize: 13 }}>{new Date(k.createdAt).toLocaleString()}</td>
+                    <td style={{ padding: '6px 8px', fontSize: 13 }}>{k.retiredAt ? new Date(k.retiredAt).toLocaleString() : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <p style={{ fontSize: 13, color: '#6c757d', marginTop: 8 }}>
+            Retired keys within the 24-hour grace window are still served via JWKS so tokens issued
+            before rotation remain verifiable. Keys outside the grace window are no longer advertised.
+          </p>
         </section>
       </div>
     </div>

@@ -2,16 +2,22 @@ package com.openidentity.security;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openidentity.domain.SigningKeyEntity;
 import com.openidentity.domain.UserSessionEntity;
 import com.openidentity.service.JwtKeyService;
+import com.openidentity.service.SecretProtectionService;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyFactory;
 import java.security.MessageDigest;
+import java.security.PublicKey;
 import java.security.Signature;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.X509EncodedKeySpec;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -26,9 +32,11 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 @ApplicationScoped
 public class TokenValidationService {
+
   @Inject EntityManager em;
   @Inject ObjectMapper objectMapper;
   @Inject JwtKeyService jwtKeyService;
+  @Inject SecretProtectionService secretProtectionService;
 
   @ConfigProperty(name = "smallrye.jwt.sign.key")
   Optional<String> signKey;
@@ -38,6 +46,8 @@ public class TokenValidationService {
 
   @ConfigProperty(name = "mp.jwt.verify.issuer", defaultValue = "http://localhost:7070")
   String issuer;
+
+  // ── Public API ─────────────────────────────────────────────────────────────
 
   public VerifiedToken verifyBearerHeader(String authHeader) {
     return verifyBearerHeader(authHeader, false);
@@ -54,6 +64,8 @@ public class TokenValidationService {
   public VerifiedToken verifyTokenWithSession(String token) {
     return verifyToken(token, true);
   }
+
+  // ── Internal ───────────────────────────────────────────────────────────────
 
   private VerifiedToken verifyBearerHeader(String authHeader, boolean requireActiveSession) {
     if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -73,17 +85,19 @@ public class TokenValidationService {
       verifySignature(parts[0], parts[1], parts[2], header);
       verifyRegisteredClaims(claims);
 
-      UUID userId = uuidClaim(claims.get("sub"), "sub");
-      UUID realmId = uuidClaim(claims.get("realmId"), "realmId");
+      UUID userId    = uuidClaim(claims.get("sub"), "sub");
+      UUID realmId   = uuidClaim(claims.get("realmId"), "realmId");
       UUID sessionId = claims.get("sid") != null ? uuidClaim(claims.get("sid"), "sid") : null;
-      String username = stringClaim(claims.get("upn"));
+      String username  = stringClaim(claims.get("upn"));
       String realmName = stringClaim(claims.get("realm"));
       List<String> roles = stringListClaim(claims.get("roles"));
       boolean admin = booleanClaim(claims.get("admin")) || roles.contains("admin");
 
       if (requireActiveSession && sessionId != null) {
         UserSessionEntity session = em.find(UserSessionEntity.class, sessionId);
-        if (session == null || !session.getUser().getId().equals(userId) || !session.getRealm().getId().equals(realmId)) {
+        if (session == null
+            || !session.getUser().getId().equals(userId)
+            || !session.getRealm().getId().equals(realmId)) {
           throw unauthorized("invalid_session");
         }
       }
@@ -96,18 +110,37 @@ public class TokenValidationService {
     }
   }
 
-  private void verifySignature(String headerPart, String payloadPart, String signaturePart, Map<String, Object> header) throws Exception {
+  /**
+   * Verifies the JWT signature.
+   *
+   * <p>For RS256 tokens the verifying public key is resolved by {@code kid} so that tokens signed
+   * before a key rotation remain valid during the grace window. Resolution order:
+   * <ol>
+   *   <li>If the token's {@code kid} matches the current active key, use it directly (fast path).
+   *   <li>Otherwise look up the key by {@code kid} in the {@code signing_key} table and decrypt
+   *       the stored PEM via {@link SecretProtectionService}.
+   *   <li>Fall back to the current active key when no {@code kid} claim is present (legacy tokens).
+   * </ol>
+   */
+  private void verifySignature(
+      String headerPart, String payloadPart, String signaturePart,
+      Map<String, Object> header) throws Exception {
+
     String alg = stringClaim(header.get("alg"));
+
     if ("RS256".equals(alg)) {
-      Signature signature = Signature.getInstance("SHA256withRSA");
-      signature.initVerify(jwtKeyService.getPublicKey());
-      signature.update((headerPart + "." + payloadPart).getBytes(StandardCharsets.UTF_8));
+      String kid = stringClaim(header.get("kid"));
+      PublicKey publicKey = resolveRs256PublicKey(kid);
+      Signature sig = Signature.getInstance("SHA256withRSA");
+      sig.initVerify(publicKey);
+      sig.update((headerPart + "." + payloadPart).getBytes(StandardCharsets.UTF_8));
       byte[] provided = Base64.getUrlDecoder().decode(signaturePart);
-      if (!signature.verify(provided)) {
+      if (!sig.verify(provided)) {
         throw unauthorized("invalid_signature");
       }
       return;
     }
+
     if (!"HS256".equals(alg) || !"HS256".equalsIgnoreCase(signAlgorithm)) {
       throw unauthorized("unsupported_token_alg");
     }
@@ -118,10 +151,51 @@ public class TokenValidationService {
     Mac mac = Mac.getInstance("HmacSHA256");
     mac.init(new SecretKeySpec(verifyKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
     byte[] computed = mac.doFinal((headerPart + "." + payloadPart).getBytes(StandardCharsets.UTF_8));
-    byte[] provided = Base64.getUrlDecoder().decode(signaturePart);
+    byte[] provided  = Base64.getUrlDecoder().decode(signaturePart);
     if (!MessageDigest.isEqual(computed, provided)) {
       throw unauthorized("invalid_signature");
     }
+  }
+
+  /**
+   * Resolves the RS256 public key for signature verification.
+   *
+   * @param kid the key ID from the JWT header, may be null
+   * @return the public key to verify against
+   */
+  private PublicKey resolveRs256PublicKey(String kid) throws Exception {
+    // Fast path: kid matches the currently active key.
+    if (kid != null && kid.equals(jwtKeyService.getKeyId())) {
+      return jwtKeyService.getPublicKey();
+    }
+
+    // Lookup retired key by kid from DB (within grace window or beyond — we validate by time
+    // via the exp claim; here we just need the right key to verify the signature).
+    if (kid != null) {
+      List<SigningKeyEntity> results = em.createQuery(
+              "select k from SigningKeyEntity k where k.keyId = :kid",
+              SigningKeyEntity.class)
+          .setParameter("kid", kid)
+          .setMaxResults(1)
+          .getResultList();
+      if (!results.isEmpty()) {
+        return parsePublicKeyPem(results.get(0).getPublicKeyPem());
+      }
+    }
+
+    // No kid claim or kid not found in DB — fall back to current active key (handles legacy tokens
+    // issued before key persistence was introduced).
+    return jwtKeyService.getPublicKey();
+  }
+
+  private RSAPublicKey parsePublicKeyPem(String pem) throws Exception {
+    String normalized = pem.replace("\r", "")
+        .replaceAll("-----BEGIN [^-]+-----", "")
+        .replaceAll("-----END [^-]+-----", "")
+        .replace("\n", "").trim();
+    byte[] der = Base64.getDecoder().decode(normalized.getBytes(StandardCharsets.UTF_8));
+    return (RSAPublicKey) KeyFactory.getInstance("RSA")
+        .generatePublic(new X509EncodedKeySpec(der));
   }
 
   private void verifyRegisteredClaims(Map<String, Object> claims) {
@@ -137,6 +211,8 @@ public class TokenValidationService {
       }
     }
   }
+
+  // ── Claim helpers ──────────────────────────────────────────────────────────
 
   private Map<String, Object> readPart(String value) throws Exception {
     byte[] jsonBytes = Base64.getUrlDecoder().decode(value);
@@ -160,25 +236,19 @@ public class TokenValidationService {
   }
 
   private String stringClaim(Object value) {
-    if (value == null) {
-      return null;
-    }
+    if (value == null) return null;
     return String.valueOf(value);
   }
 
   private boolean booleanClaim(Object value) {
-    if (value instanceof Boolean bool) {
-      return bool;
-    }
+    if (value instanceof Boolean bool) return bool;
     return value != null && Boolean.parseBoolean(String.valueOf(value));
   }
 
   private List<String> stringListClaim(Object value) {
     if (value instanceof List<?> list) {
       List<String> result = new ArrayList<>();
-      for (Object item : list) {
-        result.add(String.valueOf(item));
-      }
+      for (Object item : list) result.add(String.valueOf(item));
       return result;
     }
     return Collections.emptyList();

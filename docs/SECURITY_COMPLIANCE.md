@@ -12,13 +12,18 @@ This document states the current security baseline that exists in the repository
 - Password reset and email verification tokens are stored as hashes rather than raw reset/verify tokens.
 
 ## Current Gaps and Risks
-- Admin authentication and authorization are not yet enforced on admin APIs.
-- Token validation behavior for userinfo and introspection is not yet trustworthy enough for production use.
-- JWKS/signing model is incomplete for production-grade external verification.
-- Client secret handling needs hardening.
-- TOTP secret handling needs hardening.
-- TLS, secure headers, CSP/HSTS, and broader deployment-level controls are not guaranteed by the product as it exists in this repository.
-- Security docs historically overstated compliance posture relative to the implementation.
+- TLS, secure headers, CSP/HSTS, and broader deployment-level controls are not guaranteed by the product — these must be enforced at the ingress/load-balancer layer in production deployments.
+- In-memory rate limiter (TokenRateLimitFilter) is per-process; under multi-replica deployments (K8s) each pod has an independent counter, effectively multiplying the effective limit by replica count. Shared Redis-backed rate limiting is planned for Phase 5.
+- Distributed tracing spans are not yet emitted; token grant latency and broker flow timings exist as Micrometer timers but are not propagated as OTLP trace context.
+- SCIM provisioning is not implemented; enterprise directory inbound lifecycle is manual.
+- Org-level delegated admin enforcement (restricting admin API access by org membership) is not yet wired into AdminAuthFilter.
+
+## Resolved Gaps (previously listed here)
+- Admin authentication and authorization: enforced via AdminAuthFilter on all /admin/* paths (bootstrap token or verified admin JWT).
+- Token validation for userinfo/introspection: TokenValidationService verifies RS256 signature, expiry, issuer, and active session.
+- JWKS/signing model: RS256 keys are persisted to DB via SigningKeyEntity, encrypted at rest; JWKS endpoint serves active and grace-window retired keys; rotation API available at POST /admin/keys/rotate.
+- Client secret handling: client secrets are bcrypt-hashed before persistence via SecretProtectionService.
+- TOTP secret handling: TOTP secrets are AES-GCM encrypted at rest via SecretProtectionService.
 
 ## Phase-Based Hardening Roadmap
 
