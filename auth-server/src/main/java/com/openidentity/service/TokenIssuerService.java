@@ -13,6 +13,7 @@ import jakarta.transaction.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.eclipse.microprofile.config.ConfigProvider;
 
 @ApplicationScoped
@@ -21,6 +22,7 @@ public class TokenIssuerService {
   @Inject SessionService sessionService;
   @Inject OidcGrantService oidcGrantService;
   @Inject JwtKeyService jwtKeyService;
+  @Inject ScimRoleMappingService scimRoleMappingService;
 
   public static class IssuedTokens {
     public String accessToken;
@@ -45,11 +47,18 @@ public class TokenIssuerService {
     attachClientSessionIfNeeded(managedSession, managedClient);
     sessionService.touch(managedSession);
 
-    List<String> roleNames = em.createQuery(
-            "select r.name from RoleEntity r, UserRoleEntity ur where ur.user = :uid and ur.role = r.id",
-            String.class)
+    List<String> roleNames = scimRoleMappingService.effectiveRoleNames(
+        managedRealm.getId(), managedUser.getId());
+    List<String> orgAdminRealmIds = em.createQuery(
+            "select distinct o.realm.id from OrganizationMemberEntity m "
+                + "join m.organization o "
+                + "where m.user.id = :uid and lower(m.orgRole) = 'admin'",
+            UUID.class)
         .setParameter("uid", managedUser.getId())
-        .getResultList();
+        .getResultList()
+        .stream()
+        .map(UUID::toString)
+        .toList();
     boolean isAdmin = roleNames.stream().anyMatch("admin"::equalsIgnoreCase);
 
     Instant now = Instant.now();
@@ -65,6 +74,7 @@ public class TokenIssuerService {
         .claim("realmId", managedRealm.getId().toString())
         .claim("sid", managedSession.getId().toString())
         .claim("roles", roleNames)
+        .claim("orgAdminRealmIds", orgAdminRealmIds)
         .claim("admin", isAdmin)
         .issuedAt(now)
         .expiresIn(Duration.ofSeconds(expiresIn));
@@ -83,6 +93,7 @@ public class TokenIssuerService {
         .claim("realmId", managedRealm.getId().toString())
         .claim("sid", managedSession.getId().toString())
         .claim("roles", roleNames)
+        .claim("orgAdminRealmIds", orgAdminRealmIds)
         .claim("admin", isAdmin)
         .issuedAt(now)
         .expiresIn(Duration.ofSeconds(expiresIn));

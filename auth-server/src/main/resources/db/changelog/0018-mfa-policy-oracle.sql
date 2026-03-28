@@ -1,0 +1,2 @@
+ALTER TABLE realm ADD mfa_required NUMBER(1) DEFAULT 0 NOT NULL;
+ALTER TABLE realm ADD mfa_policy   VARCHAR2(32) DEFAULT 'optional' NOT NULL;

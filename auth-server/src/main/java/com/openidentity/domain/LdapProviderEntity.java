@@ -57,6 +57,18 @@ public class LdapProviderEntity {
   @Column(name = "created_at")
   private OffsetDateTime createdAt;
 
+  /** Timestamp of the last completed scheduled or manual reconciliation run. */
+  @Column(name = "last_reconciled_at")
+  private OffsetDateTime lastReconciledAt;
+
+  /**
+   * When true, users that are NOT found in the LDAP directory during reconciliation
+   * are permanently deleted from the local IAM store rather than just disabled.
+   * Use with caution — this is irreversible.
+   */
+  @Column(name = "hard_delete_missing", nullable = false)
+  private Boolean hardDeleteMissing = Boolean.FALSE;
+
   public UUID getId() {
     return id;
   }
@@ -167,5 +179,21 @@ public class LdapProviderEntity {
 
   public void setCreatedAt(OffsetDateTime createdAt) {
     this.createdAt = createdAt;
+  }
+
+  public OffsetDateTime getLastReconciledAt() {
+    return lastReconciledAt;
+  }
+
+  public void setLastReconciledAt(OffsetDateTime lastReconciledAt) {
+    this.lastReconciledAt = lastReconciledAt;
+  }
+
+  public Boolean getHardDeleteMissing() {
+    return hardDeleteMissing;
+  }
+
+  public void setHardDeleteMissing(Boolean hardDeleteMissing) {
+    this.hardDeleteMissing = hardDeleteMissing;
   }
 }

@@ -42,6 +42,8 @@ services:
       # Leave blank to auto-generate RS256 key on first boot (persisted to DB):
       OPENIDENTITY_JWT_PRIVATE_KEY_PEM: ""
       OPENIDENTITY_JWT_PUBLIC_KEY_PEM: ""
+      # Redis for shared rate-limit state across replicas:
+      REDIS_URL: "redis://redis:6379"
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:7070/q/health/ready || exit 1"]
       interval: 15s
@@ -68,6 +70,32 @@ services:
     restart: unless-stopped
     ports:
       - "3001:80"
+    depends_on:
+      - auth-server
+
+  redis:
+    image: redis:7-alpine
+    container_name: openidentity-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.96.0
+    container_name: openidentity-otel
+    restart: unless-stopped
+    volumes:
+      - ./deploy/otel/otel-collector.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+      - "8888:8888"    # Collector metrics
     depends_on:
       - auth-server
 

@@ -7,6 +7,7 @@ on:
     branches: [ main, master ]
 
 jobs:
+  # ── Build + integration tests ───────────────────────────────────────────────
   build-and-test:
     runs-on: ubuntu-latest
     strategy:
@@ -46,7 +47,7 @@ jobs:
           cache-dependency-path: |
             admin-ui/package-lock.json
             account-ui/package-lock.json
-      - name: Build
+      - name: Build backend
         run: mvn -q -DskipTests install
         working-directory: auth-server
       - name: Build Admin UI
@@ -55,10 +56,10 @@ jobs:
       - name: Build Account UI
         run: npm ci && npm run build
         working-directory: account-ui
-      - name: Dependency audit (Admin UI)
+      - name: Dependency audit — Admin UI
         run: npm audit --audit-level=high
         working-directory: admin-ui
-      - name: Dependency audit (Account UI)
+      - name: Dependency audit — Account UI
         run: npm audit --audit-level=high
         working-directory: account-ui
       - name: Test (H2)
@@ -83,3 +84,138 @@ jobs:
         working-directory: auth-server
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
+
+  # ── OWASP dependency-check (Java) ───────────────────────────────────────────
+  owasp-dependency-check:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: OWASP dependency-check
+        run: |
+          mvn org.owasp:dependency-check-maven:check \
+            -DfailBuildOnCVSS=8 \
+            -DsuppressionFile=.owasp-suppressions.xml \
+            -Dformats=HTML,JSON \
+            || true
+        working-directory: auth-server
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+      - name: Upload dependency-check report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: owasp-dependency-check-report
+          path: auth-server/target/dependency-check-report.*
+          retention-days: 30
+
+  # ── Container image build + scan ────────────────────────────────────────────
+  container-scan:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Build backend (for Docker)
+        run: mvn -q -DskipTests package
+        working-directory: auth-server
+      - name: Build container image
+        run: docker build -t openidentity-auth:ci .
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: openidentity-auth:ci
+          format: table
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+  # ── Staging smoke test ──────────────────────────────────────────────────────
+  smoke-test:
+    runs-on: ubuntu-latest
+    needs: [build-and-test, container-scan]
+    # Only run smoke test on pushes to main/master, not on every PR
+    if: github.event_name == 'push'
+    services:
+      postgres:
+        image: postgres:15
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: openid
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Build backend
+        run: mvn -q -DskipTests package
+        working-directory: auth-server
+      - name: Start auth-server in background
+        run: |
+          java \
+            -Dquarkus.datasource.db-kind=postgresql \
+            -Dquarkus.datasource.jdbc.url=jdbc:postgresql://localhost:5432/openid \
+            -Dquarkus.datasource.username=postgres \
+            -Dquarkus.datasource.password=postgres \
+            -Dquarkus.http.port=7070 \
+            -Dsmallrye.jwt.sign.key=0123456789abcdef0123456789abcdef \
+            -Dopenidentity.secret-protection.key=ci-smoke-secret-protection-key32 \
+            -Dopenidentity.admin.bootstrap-token=smoke-bootstrap-token \
+            -jar auth-server/target/quarkus-app/quarkus-run.jar &
+          echo "Waiting for auth-server to be ready..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:7070/q/health/ready; then
+              echo "Ready."
+              break
+            fi
+            sleep 2
+          done
+      - name: Smoke — health endpoints
+        run: |
+          curl -sf http://localhost:7070/q/health/live  | grep '"status": "UP"'
+          curl -sf http://localhost:7070/q/health/ready | grep '"status": "UP"'
+      - name: Smoke — JWKS endpoint
+        run: |
+          curl -sf -X POST http://localhost:7070/admin/realms \
+            -H "Authorization: Bearer smoke-bootstrap-token" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"smoke","displayName":"Smoke"}' > /dev/null
+          curl -sf http://localhost:7070/auth/realms/smoke/protocol/openid-connect/certs \
+            | grep '"kty"'
+      - name: Smoke — discovery document has resolved URLs
+        run: |
+          DOC=$(curl -sf http://localhost:7070/auth/realms/smoke/.well-known/openid-configuration)
+          echo "$DOC" | grep '"token_endpoint"'
+          # Must NOT contain literal {realm}
+          echo "$DOC" | grep -v '{realm}'
+      - name: Smoke — admin API accessible
+        run: |
+          curl -sf http://localhost:7070/admin/realms \
+            -H "Authorization: Bearer smoke-bootstrap-token" \
+            | grep '"name"'
+      - name: Smoke — metrics endpoint
+        run: |
+          curl -sf http://localhost:7070/q/metrics \
+            | grep 'openidentity_'

@@ -8,11 +8,17 @@ F:\SSO-app\auth-server\src\test\java\com\openidentity\OidcBrokerFlowTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\OidcCodeFlowTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\OidcIdentityProviderConfigTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\OpenApiTest.java
+F:\SSO-app\auth-server\src\test\java\com\openidentity\OrgAdminAuthTest.java
+F:\SSO-app\auth-server\src\test\java\com\openidentity\OrganizationsTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\PasswordResetAndEmailVerificationTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\SamlAuthnRequestSigningTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\SamlBrokerFlowTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\SamlBrokerSignatureValidationTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\SamlIdentityProviderConfigTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\SamlSingleLogoutFlowTest.java
+F:\SSO-app\auth-server\src\test\java\com\openidentity\ScimOutboundProvisioningTest.java
+F:\SSO-app\auth-server\src\test\java\com\openidentity\ScimProvisioningTest.java
+F:\SSO-app\auth-server\src\test\java\com\openidentity\SigningKeyRotationTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\support\TestLdapConnector.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\support\TestOidcBrokerConnector.java
+F:\SSO-app\auth-server\src\test\java\com\openidentity\support\TestScimOutboundConnector.java

@@ -23,6 +23,24 @@ public class RealmEntity {
   @Column(name = "created_at")
   private OffsetDateTime createdAt;
 
+  /**
+   * When true, every login in this realm requires a valid TOTP code regardless
+   * of whether the user has enrolled a TOTP credential. Users without a TOTP
+   * credential enrolled will be blocked until they enroll one.
+   */
+  @Column(name = "mfa_required", nullable = false)
+  private Boolean mfaRequired = Boolean.FALSE;
+
+  /**
+   * MFA policy level. Current supported values:
+   * <ul>
+   *   <li>{@code optional} — TOTP enforced only when the user has enrolled (default).
+   *   <li>{@code required} — TOTP required for all users; synonym for mfaRequired=true.
+   * </ul>
+   */
+  @Column(name = "mfa_policy", nullable = false)
+  private String mfaPolicy = "optional";
+
   public UUID getId() {
     return id;
   }
@@ -61,6 +79,22 @@ public class RealmEntity {
 
   public void setCreatedAt(OffsetDateTime createdAt) {
     this.createdAt = createdAt;
+  }
+
+  public Boolean getMfaRequired() {
+    return mfaRequired;
+  }
+
+  public void setMfaRequired(Boolean mfaRequired) {
+    this.mfaRequired = mfaRequired;
+  }
+
+  public String getMfaPolicy() {
+    return mfaPolicy;
+  }
+
+  public void setMfaPolicy(String mfaPolicy) {
+    this.mfaPolicy = mfaPolicy;
   }
 }
 

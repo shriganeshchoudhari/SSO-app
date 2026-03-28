@@ -529,4 +529,214 @@
         </preConditions>
         <sqlFile relativeToChangelogFile="true" path="0015-organizations-oracle.sql" endDelimiter=";" splitStatements="true" />
     </changeSet>
+
+    <changeSet id="0016-scim-postgresql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0016-scim.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0016-scim-h2" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="h2"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0016-scim-h2.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0016-scim-mysql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mysql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0016-scim-mysql.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0016-scim-mariadb" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mariadb"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0016-scim-mariadb.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0016-scim-oracle" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="oracle"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0016-scim-oracle.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0017-ldap-lifecycle-postgresql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0017-ldap-lifecycle.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0017-ldap-lifecycle-h2" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="h2"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0017-ldap-lifecycle-h2.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0017-ldap-lifecycle-mysql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mysql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0017-ldap-lifecycle-mysql.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0017-ldap-lifecycle-mariadb" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mariadb"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0017-ldap-lifecycle-mariadb.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0017-ldap-lifecycle-oracle" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="oracle"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0017-ldap-lifecycle-oracle.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0018-mfa-policy-postgresql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0018-mfa-policy.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0018-mfa-policy-h2" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="h2"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0018-mfa-policy-h2.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0018-mfa-policy-mysql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mysql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0018-mfa-policy-mysql.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0018-mfa-policy-mariadb" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mariadb"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0018-mfa-policy-mariadb.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0018-mfa-policy-oracle" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="oracle"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0018-mfa-policy-oracle.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0019-scim-group-role-mapping-postgresql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0019-scim-group-role-mapping.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0019-scim-group-role-mapping-h2" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="h2"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0019-scim-group-role-mapping-h2.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0019-scim-group-role-mapping-mysql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mysql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0019-scim-group-role-mapping-mysql.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0019-scim-group-role-mapping-mariadb" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mariadb"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0019-scim-group-role-mapping-mariadb.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0019-scim-group-role-mapping-oracle" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="oracle"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0019-scim-group-role-mapping-oracle.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0020-scim-settings-postgresql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0020-scim-settings.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0020-scim-settings-h2" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="h2"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0020-scim-settings-h2.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0020-scim-settings-mysql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mysql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0020-scim-settings-mysql.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0020-scim-settings-mariadb" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mariadb"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0020-scim-settings-mariadb.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0020-scim-settings-oracle" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="oracle"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0020-scim-settings-oracle.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0021-scim-outbound-targets-postgresql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0021-scim-outbound-targets.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0021-scim-outbound-targets-h2" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="h2"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0021-scim-outbound-targets-h2.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0021-scim-outbound-targets-mysql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mysql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0021-scim-outbound-targets-mysql.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0021-scim-outbound-targets-mariadb" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mariadb"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0021-scim-outbound-targets-mariadb.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0021-scim-outbound-targets-oracle" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="oracle"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0021-scim-outbound-targets-oracle.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
 </databaseChangeLog>

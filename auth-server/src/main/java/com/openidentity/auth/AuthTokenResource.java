@@ -14,6 +14,7 @@ import com.openidentity.service.OidcGrantService;
 import com.openidentity.service.SecretProtectionService;
 import com.openidentity.service.SessionService;
 import com.openidentity.service.TokenIssuerService;
+import com.openidentity.service.TracingService;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.ws.rs.Consumes;
@@ -44,6 +45,7 @@ public class AuthTokenResource {
   @Inject OidcClientService oidcClientService;
   @Inject OidcGrantService oidcGrantService;
   @Inject TokenIssuerService tokenIssuerService;
+  @Inject TracingService tracingService;
 
   public static class TokenResponse {
     public String access_token;
@@ -72,10 +74,12 @@ public class AuthTokenResource {
     RealmEntity realm = requireRealm(realmName);
     try {
       return switch (grantType) {
-        case "password" -> passwordGrant(realm, clientId, clientSecret, username, password, totp);
-        case "authorization_code" ->
-            authorizationCodeGrant(realm, clientId, clientSecret, code, redirectUri, codeVerifier);
-        case "refresh_token" -> refreshTokenGrant(realm, clientId, clientSecret, refreshToken);
+        case "password" -> tracingService.traceTokenGrant("password", "local",
+            () -> passwordGrant(realm, clientId, clientSecret, username, password, totp));
+        case "authorization_code" -> tracingService.traceTokenGrant("authorization_code", "oidc",
+            () -> authorizationCodeGrant(realm, clientId, clientSecret, code, redirectUri, codeVerifier));
+        case "refresh_token" -> tracingService.traceTokenGrant("refresh_token", "session",
+            () -> refreshTokenGrant(realm, clientId, clientSecret, refreshToken));
         default -> throw new WebApplicationException("unsupported_grant_type", Response.Status.BAD_REQUEST);
       };
     } catch (WebApplicationException e) {
@@ -210,7 +214,7 @@ public class AuthTokenResource {
       if (ldapAuthenticated == null || Boolean.FALSE.equals(ldapAuthenticated.user().getEnabled())) {
         throw new WebApplicationException("invalid_grant", Response.Status.UNAUTHORIZED);
       }
-      enforceTotpIfConfigured(ldapAuthenticated.user(), totp);
+      enforceTotpIfConfigured(ldapAuthenticated.user(), realm, totp);
       return new AuthenticatedUser(ldapAuthenticated.user(), "ldap", ldapAuthenticated.providerName());
     }
 
@@ -223,7 +227,7 @@ public class AuthTokenResource {
         .findFirst()
         .orElse(null);
     if (passwordCredential != null && BCrypt.checkpw(password, passwordCredential.getValueHash())) {
-      enforceTotpIfConfigured(user, totp);
+      enforceTotpIfConfigured(user, realm, totp);
       return new AuthenticatedUser(user, "local", null);
     }
 
@@ -231,11 +235,11 @@ public class AuthTokenResource {
     if (ldapAuthenticated == null || Boolean.FALSE.equals(ldapAuthenticated.user().getEnabled())) {
       throw new WebApplicationException("invalid_grant", Response.Status.UNAUTHORIZED);
     }
-    enforceTotpIfConfigured(ldapAuthenticated.user(), totp);
+    enforceTotpIfConfigured(ldapAuthenticated.user(), realm, totp);
     return new AuthenticatedUser(ldapAuthenticated.user(), "ldap", ldapAuthenticated.providerName());
   }
 
-  private void enforceTotpIfConfigured(UserEntity user, String totp) {
+  private void enforceTotpIfConfigured(UserEntity user, RealmEntity realm, String totp) {
     var totpCredential = em.createQuery(
             "select c from CredentialEntity c where c.user.id = :uid and c.type = 'totp' order by c.createdAt desc",
             CredentialEntity.class)
@@ -243,11 +247,18 @@ public class AuthTokenResource {
         .setMaxResults(1)
         .getResultStream()
         .findFirst();
+
     if (totpCredential.isPresent()) {
+      // User has TOTP enrolled — always verify the code.
       String storedSecret = secretProtectionService.revealTotpSecret(totpCredential.get().getValueHash());
       if (totp == null || !mfaTotpService.verify(storedSecret, totp)) {
         throw new WebApplicationException("invalid_grant", Response.Status.UNAUTHORIZED);
       }
+    } else if (Boolean.TRUE.equals(realm.getMfaRequired()
+        ) || "required".equalsIgnoreCase(realm.getMfaPolicy())) {
+      // Realm-level MFA required but user has no TOTP enrolled.
+      // Block the login — the user must enroll TOTP via the account portal first.
+      throw new WebApplicationException("mfa_enrollment_required", Response.Status.UNAUTHORIZED);
     }
   }
 

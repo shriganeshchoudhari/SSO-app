@@ -65,6 +65,8 @@ spec:
                 secretKeyRef:
                   name: openidentity-secrets
                   key: OPENIDENTITY_JWT_PUBLIC_KEY_PEM
+            - name: REDIS_URL
+              value: "redis://openidentity-redis:6379"
           livenessProbe:
             httpGet:
               path: /q/health/live

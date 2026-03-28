@@ -18,6 +18,7 @@ public class LdapFederationService {
   @Inject SecretProtectionService secretProtectionService;
   @Inject LdapConnector ldapConnector;
   @Inject FederationPolicyService federationPolicyService;
+  @Inject UserLifecycleService userLifecycleService;
 
   public record LdapDirectoryUser(String username, String email) {}
 
@@ -149,11 +150,20 @@ public class LdapFederationService {
         }
         continue;
       }
-      if (lookup.status() == LdapLookupStatus.NOT_FOUND && Boolean.TRUE.equals(provider.getDisableMissingUsers()) && !Boolean.FALSE.equals(user.getEnabled())) {
-        user.setEnabled(Boolean.FALSE);
-        disabled++;
+      if (lookup.status() == LdapLookupStatus.NOT_FOUND) {
+        if (Boolean.TRUE.equals(provider.getHardDeleteMissing())) {
+          // Permanent removal — user no longer exists in the directory.
+          userLifecycleService.deleteUser(user);
+          disabled++;
+        } else if (Boolean.TRUE.equals(provider.getDisableMissingUsers()) && !Boolean.FALSE.equals(user.getEnabled())) {
+          user.setEnabled(Boolean.FALSE);
+          disabled++;
+        }
       }
     }
+    // Stamp last reconcile time on the provider record.
+    provider.setLastReconciledAt(OffsetDateTime.now());
+    em.merge(provider);
     return new LdapReconcileResult(users.size(), updated, disabled);
   }
 

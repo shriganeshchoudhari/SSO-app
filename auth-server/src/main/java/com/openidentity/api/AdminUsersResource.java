@@ -9,6 +9,8 @@ import com.openidentity.domain.RoleEntity;
 import com.openidentity.domain.CredentialEntity;
 import com.openidentity.domain.UserEntity;
 import com.openidentity.service.FederationPolicyService;
+import com.openidentity.service.ScimRoleMappingService;
+import com.openidentity.service.UserLifecycleService;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import jakarta.inject.Inject;
@@ -36,6 +38,8 @@ public class AdminUsersResource {
 
   @Inject EntityManager em;
   @Inject FederationPolicyService federationPolicyService;
+  @Inject ScimRoleMappingService scimRoleMappingService;
+  @Inject UserLifecycleService userLifecycleService;
 
   @GET
   @Operation(summary = "List users in realm")
@@ -73,12 +77,7 @@ public class AdminUsersResource {
     if (u == null || !u.getRealm().getId().equals(realmId)) {
       throw new NotFoundException("User not found");
     }
-    return em.createQuery(
-            "select r from RoleEntity r, UserRoleEntity ur where ur.user = :uid and ur.role = r.id and r.realm.id = :rid order by r.name",
-            RoleEntity.class)
-        .setParameter("uid", userId)
-        .setParameter("rid", realmId)
-        .getResultList().stream()
+    return scimRoleMappingService.effectiveRoles(realmId, userId).stream()
         .map(r -> new RoleResponse(r.getId(), r.getRealm().getId(), r.getName(), r.getClient() != null ? r.getClient().getId() : null))
         .collect(Collectors.toList());
   }
@@ -191,7 +190,7 @@ public class AdminUsersResource {
     if (u == null || !u.getRealm().getId().equals(realmId)) {
       throw new NotFoundException("User not found");
     }
-    em.remove(u);
+    userLifecycleService.deleteUser(u);
     return Response.noContent().build();
   }
 
