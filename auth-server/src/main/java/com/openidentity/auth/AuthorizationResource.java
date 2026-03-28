@@ -81,6 +81,8 @@ public class AuthorizationResource {
       @FormParam("totp") String totp) {
     RealmEntity realm = requireRealm(realmName);
     ClientEntity client = validateAuthorizeRequest(realm, responseType, clientId, redirectUri, codeChallenge);
+    String brokerOptions = buildBrokerOptions(realm, responseType, clientId, redirectUri,
+        scope, state, codeChallenge, codeChallengeMethod);
     try {
       UserEntity user = authenticateUser(realm, username, password, totp);
       UserSessionEntity session = sessionService.createUserSession(realm, user);
@@ -92,11 +94,17 @@ public class AuthorizationResource {
       return Response.seeOther(redirectWithParams(redirectUri, "code", code, "state", state)).build();
     } catch (WebApplicationException e) {
       // Re-render the login form with an error indicator rather than redirecting with error
-      String brokerOptions = buildBrokerOptions(realm, responseType, clientId, redirectUri,
-          scope, state, codeChallenge, codeChallengeMethod);
       String html = buildLoginPage(realm, responseType, clientId, redirectUri,
           scope, state, codeChallenge, codeChallengeMethod, brokerOptions, "invalid_credentials", false);
       return Response.status(Response.Status.UNAUTHORIZED).entity(html).type(MediaType.TEXT_HTML).build();
+    } catch (Exception e) {
+      // Defensive catch: session/grant persistence failures should also return the login UI.
+      String html = buildLoginPage(realm, responseType, clientId, redirectUri,
+          scope, state, codeChallenge, codeChallengeMethod, brokerOptions, "login_failed", false);
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity(html)
+          .type(MediaType.TEXT_HTML)
+          .build();
     }
   }
 
@@ -110,6 +118,8 @@ public class AuthorizationResource {
 
     String realmLabel = escapeHtml(
         realm.getDisplayName() != null ? realm.getDisplayName() : realm.getName());
+    String pageTitle = realmLabel;
+    String subtitle = realmLabel;
     String errorHtml = (error != null && !error.isBlank()) ? """
         <div class="error-banner">
           Incorrect username or password. Please try again.
@@ -270,8 +280,8 @@ public class AuthorizationResource {
         </body>
         </html>
         """.formatted(
-        realmLabel,
-        realmLabel,
+        pageTitle,
+        subtitle,
         errorHtml,
         escapeHtml(responseType != null ? responseType : ""),
         escapeHtml(clientId != null ? clientId : ""),
