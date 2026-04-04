@@ -23,6 +23,18 @@ public class OrganizationEntity {
   @Column(name = "display_name")
   private String displayName;
 
+  @Column(name = "logo_text")
+  private String logoText;
+
+  @Column(name = "primary_color")
+  private String primaryColor;
+
+  @Column(name = "accent_color")
+  private String accentColor;
+
+  @Column(name = "locale")
+  private String locale;
+
   @Column(name = "enabled", nullable = false)
   private Boolean enabled = Boolean.TRUE;
 
@@ -40,6 +52,18 @@ public class OrganizationEntity {
 
   public String getDisplayName() { return displayName; }
   public void setDisplayName(String displayName) { this.displayName = displayName; }
+
+  public String getLogoText() { return logoText; }
+  public void setLogoText(String logoText) { this.logoText = logoText; }
+
+  public String getPrimaryColor() { return primaryColor; }
+  public void setPrimaryColor(String primaryColor) { this.primaryColor = primaryColor; }
+
+  public String getAccentColor() { return accentColor; }
+  public void setAccentColor(String accentColor) { this.accentColor = accentColor; }
+
+  public String getLocale() { return locale; }
+  public void setLocale(String locale) { this.locale = locale; }
 
   public Boolean getEnabled() { return enabled; }
   public void setEnabled(Boolean enabled) { this.enabled = enabled; }

@@ -18,6 +18,7 @@ import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -41,6 +42,8 @@ import java.util.stream.Collectors;
 @Consumes(MediaType.APPLICATION_JSON)
 @Tag(name = "Organizations", description = "Organization / tenant management")
 public class AdminOrganizationsResource {
+  private static final Pattern HEX_COLOR = Pattern.compile("^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$");
+  private static final Pattern LOCALE = Pattern.compile("^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{2,8})*$");
 
   @Inject EntityManager em;
 
@@ -88,8 +91,12 @@ public class AdminOrganizationsResource {
     org.setId(UUID.randomUUID());
     org.setRealm(realm);
     org.setName(req.name.trim());
-    org.setDisplayName(req.displayName);
-    org.setEnabled(Boolean.TRUE);
+    org.setDisplayName(normalizeNullable(req.displayName));
+    org.setLogoText(normalizeLogoText(req.logoText));
+    org.setPrimaryColor(normalizeColor(req.primaryColor, "primaryColor"));
+    org.setAccentColor(normalizeColor(req.accentColor, "accentColor"));
+    org.setLocale(normalizeLocale(req.locale));
+    org.setEnabled(req.enabled != null ? req.enabled : Boolean.TRUE);
     org.setCreatedAt(OffsetDateTime.now());
     em.persist(org);
 
@@ -118,7 +125,11 @@ public class AdminOrganizationsResource {
       UpdateOrganizationRequest req) {
     if (req == null) throw new BadRequestException("Request body required");
     OrganizationEntity org = requireOrg(realmId, orgId);
-    if (req.displayName != null) org.setDisplayName(req.displayName);
+    if (req.displayName != null) org.setDisplayName(normalizeNullable(req.displayName));
+    if (req.logoText != null) org.setLogoText(normalizeLogoText(req.logoText));
+    if (req.primaryColor != null) org.setPrimaryColor(normalizeColor(req.primaryColor, "primaryColor"));
+    if (req.accentColor != null) org.setAccentColor(normalizeColor(req.accentColor, "accentColor"));
+    if (req.locale != null) org.setLocale(normalizeLocale(req.locale));
     if (req.enabled     != null) org.setEnabled(req.enabled);
     em.merge(org);
     return toResponse(org);
@@ -246,12 +257,51 @@ public class AdminOrganizationsResource {
   private OrganizationResponse toResponse(OrganizationEntity o) {
     return new OrganizationResponse(
         o.getId(), o.getRealm().getId(), o.getName(),
-        o.getDisplayName(), o.getEnabled(), o.getCreatedAt());
+        o.getDisplayName(), o.getLogoText(), o.getPrimaryColor(), o.getAccentColor(),
+        o.getLocale(), o.getEnabled(), o.getCreatedAt());
   }
 
   private MemberResponse toMemberResponse(OrganizationMemberEntity m) {
     return new MemberResponse(
         m.getId(), m.getOrganization().getId(),
         m.getUser().getId(), m.getOrgRole(), m.getJoinedAt());
+  }
+
+  private String normalizeNullable(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
+  }
+
+  private String normalizeLogoText(String value) {
+    String normalized = normalizeNullable(value);
+    if (normalized != null && normalized.length() > 24) {
+      throw new BadRequestException("logoText must be 24 characters or fewer");
+    }
+    return normalized;
+  }
+
+  private String normalizeColor(String value, String fieldName) {
+    String normalized = normalizeNullable(value);
+    if (normalized == null) {
+      return null;
+    }
+    if (!HEX_COLOR.matcher(normalized).matches()) {
+      throw new BadRequestException(fieldName + " must be a 3- or 6-digit hex color");
+    }
+    return normalized;
+  }
+
+  private String normalizeLocale(String value) {
+    String normalized = normalizeNullable(value);
+    if (normalized == null) {
+      return null;
+    }
+    if (!LOCALE.matcher(normalized).matches()) {
+      throw new BadRequestException("locale must be a BCP 47 style tag such as en or en-US");
+    }
+    return normalized;
   }
 }

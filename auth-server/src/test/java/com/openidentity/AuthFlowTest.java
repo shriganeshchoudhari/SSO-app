@@ -8,6 +8,7 @@ import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 import java.util.Map;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 @QuarkusTest
@@ -126,5 +127,68 @@ public class AuthFlowTest {
         .when().post("/auth/realms/security/protocol/openid-connect/token/introspect")
         .then().statusCode(200)
         .body("active", is(false));
+  }
+
+  @Test
+  void realm_mfa_policy_blocks_unenrolled_users_on_password_and_browser_login() {
+    Response realmResp = adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.of(
+            "name", "mfa-required",
+            "displayName", "MFA Required",
+            "mfaPolicy", "required"))
+        .when().post("/admin/realms")
+        .then().statusCode(anyOf(is(200), is(201)))
+        .extract().response();
+    String realmId = realmResp.jsonPath().getString("id");
+
+    adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.of(
+            "clientId", "browser-client",
+            "protocol", "openid-connect",
+            "publicClient", true,
+            "redirectUris", List.of("https://app.example.com/callback"),
+            "grantTypes", List.of("authorization_code")))
+        .when().post("/admin/realms/" + realmId + "/clients")
+        .then().statusCode(anyOf(is(200), is(201)));
+
+    Response userResp = adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.of("username", "mfa-user", "email", "mfa-user@example.com", "enabled", true))
+        .when().post("/admin/realms/" + realmId + "/users")
+        .then().statusCode(anyOf(is(200), is(201)))
+        .extract().response();
+    String userId = userResp.jsonPath().getString("id");
+
+    adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.of("password", "Secret123!"))
+        .when().post("/admin/realms/" + realmId + "/users/" + userId + "/credentials/password")
+        .then().statusCode(anyOf(is(200), is(201), is(204)));
+
+    given()
+        .contentType("application/x-www-form-urlencoded")
+        .formParam("grant_type", "password")
+        .formParam("client_id", "web-app")
+        .formParam("username", "mfa-user")
+        .formParam("password", "Secret123!")
+        .when().post("/auth/realms/mfa-required/protocol/openid-connect/token")
+        .then().statusCode(401);
+
+    given()
+        .contentType("application/x-www-form-urlencoded")
+        .formParam("response_type", "code")
+        .formParam("client_id", "browser-client")
+        .formParam("redirect_uri", "https://app.example.com/callback")
+        .formParam("scope", "openid profile")
+        .formParam("state", "state-1")
+        .formParam("code_challenge", "plain-code-challenge")
+        .formParam("code_challenge_method", "plain")
+        .formParam("username", "mfa-user")
+        .formParam("password", "Secret123!")
+        .when().post("/auth/realms/mfa-required/protocol/openid-connect/auth")
+        .then().statusCode(401)
+        .body(containsString("requires an enrolled authenticator"));
   }
 }

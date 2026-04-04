@@ -8,6 +8,7 @@ import com.openidentity.security.TokenValidationService;
 import com.openidentity.security.VerifiedToken;
 import com.openidentity.service.FederationPolicyService;
 import com.openidentity.service.MfaTotpService;
+import com.openidentity.service.ScimOutboundProvisioningService;
 import com.openidentity.service.SecretProtectionService;
 import io.smallrye.common.annotation.Blocking;
 import jakarta.inject.Inject;
@@ -41,6 +42,7 @@ public class AccountResource {
   @Inject TokenValidationService tokenValidationService;
   @Inject FederationPolicyService federationPolicyService;
   @Inject MfaTotpService mfaTotpService;
+  @Inject ScimOutboundProvisioningService scimOutboundProvisioningService;
   @Inject SecretProtectionService secretProtectionService;
 
   public static class UpdateProfileRequest {
@@ -94,6 +96,7 @@ public class AccountResource {
       }
       user.setEmail(req.email);
     }
+    scimOutboundProvisioningService.syncUserToAutoTargets(user);
     return Response.noContent().build();
   }
 

@@ -1,7 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import '@patternfly/react-core/dist/styles/base.css'
 
-type Realm = { id: string; name: string; displayName?: string; enabled?: boolean }
+type Realm = {
+  id: string
+  name: string
+  displayName?: string
+  enabled?: boolean
+  mfaRequired?: boolean
+  mfaPolicy?: string
+}
 type User = {
   id: string
   realmId: string
@@ -92,8 +99,20 @@ type Organization = {
   realmId: string
   name: string
   displayName?: string | null
+  logoText?: string | null
+  primaryColor?: string | null
+  accentColor?: string | null
+  locale?: string | null
   enabled?: boolean
   createdAt?: string
+}
+type OrganizationDraft = {
+  displayName: string
+  enabled: boolean
+  logoText: string
+  primaryColor: string
+  accentColor: string
+  locale: string
 }
 type OrgMember = {
   id: string
@@ -119,13 +138,26 @@ const parseLines = (value: string) =>
     .filter(Boolean)
 
 const isExternallyManagedUser = (user: User) => Boolean(user.federationSource)
+const toOrganizationDraft = (org: Organization): OrganizationDraft => ({
+  displayName: org.displayName ?? '',
+  enabled: org.enabled !== false,
+  logoText: org.logoText ?? '',
+  primaryColor: org.primaryColor ?? '',
+  accentColor: org.accentColor ?? '',
+  locale: org.locale ?? ''
+})
 
 export default function App() {
   const [accessToken, setAccessToken] = useState('')
   const [realms, setRealms] = useState<Realm[]>([])
   const [realmName, setRealmName] = useState('')
   const [realmDisplayName, setRealmDisplayName] = useState('')
+  const [realmMfaPolicy, setRealmMfaPolicy] = useState('optional')
   const [creatingRealm, setCreatingRealm] = useState(false)
+  const [realmEditDisplayName, setRealmEditDisplayName] = useState('')
+  const [realmEditEnabled, setRealmEditEnabled] = useState(true)
+  const [realmEditMfaPolicy, setRealmEditMfaPolicy] = useState('optional')
+  const [savingRealm, setSavingRealm] = useState(false)
 
   const [selectedRealmId, setSelectedRealmId] = useState<string | null>(null)
   const [users, setUsers] = useState<User[]>([])
@@ -201,11 +233,17 @@ export default function App() {
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [orgName, setOrgName] = useState('')
   const [orgDisplayName, setOrgDisplayName] = useState('')
+  const [orgLogoText, setOrgLogoText] = useState('')
+  const [orgPrimaryColor, setOrgPrimaryColor] = useState('')
+  const [orgAccentColor, setOrgAccentColor] = useState('')
+  const [orgLocale, setOrgLocale] = useState('')
   const [creatingOrg, setCreatingOrg] = useState(false)
+  const [savingOrgId, setSavingOrgId] = useState<string | null>(null)
   const [expandedOrgId, setExpandedOrgId] = useState<string | null>(null)
   const [orgMembers, setOrgMembers] = useState<Record<string, OrgMember[]>>({})
   const [addMemberUserId, setAddMemberUserId] = useState<Record<string, string>>({})
   const [addMemberRole, setAddMemberRole] = useState<Record<string, string>>({})
+  const [orgDrafts, setOrgDrafts] = useState<Record<string, OrganizationDraft>>({})
 
   // ── Signing Keys state ─────────────────────────────────────────────────────
   const [signingKeys, setSigningKeys] = useState<SigningKey[]>([])
@@ -214,11 +252,29 @@ export default function App() {
 
   const selectedRealm = useMemo(() => realms.find(r => r.id === selectedRealmId) || null, [realms, selectedRealmId])
 
+  useEffect(() => {
+    if (!selectedRealm) {
+      setRealmEditDisplayName('')
+      setRealmEditEnabled(true)
+      setRealmEditMfaPolicy('optional')
+      return
+    }
+    setRealmEditDisplayName(selectedRealm.displayName ?? '')
+    setRealmEditEnabled(Boolean(selectedRealm.enabled))
+    setRealmEditMfaPolicy(selectedRealm.mfaPolicy ?? (selectedRealm.mfaRequired ? 'required' : 'optional'))
+  }, [selectedRealm])
+
   // ── Organizations loaders ─────────────────────────────────────────────────
   const loadOrganizations = async (realmId: string) => {
     const res = await fetch(`/admin/realms/${realmId}/organizations`, { headers: authHeaders() })
-    if (!res.ok) { setOrganizations([]); return }
-    setOrganizations(await res.json())
+    if (!res.ok) {
+      setOrganizations([])
+      setOrgDrafts({})
+      return
+    }
+    const data: Organization[] = await res.json()
+    setOrganizations(data)
+    setOrgDrafts(Object.fromEntries(data.map(org => [org.id, toOrganizationDraft(org)])))
   }
 
   const loadOrgMembers = async (realmId: string, orgId: string) => {
@@ -235,13 +291,54 @@ export default function App() {
     try {
       const res = await fetch(`/admin/realms/${selectedRealmId}/organizations`, {
         method: 'POST', headers: authHeaders(true),
-        body: JSON.stringify({ name: orgName.trim(), displayName: orgDisplayName.trim() || undefined })
+        body: JSON.stringify({
+          name: orgName.trim(),
+          displayName: orgDisplayName.trim() || undefined,
+          logoText: orgLogoText.trim() || undefined,
+          primaryColor: orgPrimaryColor.trim() || undefined,
+          accentColor: orgAccentColor.trim() || undefined,
+          locale: orgLocale.trim() || undefined
+        })
       })
       if (!res.ok) { setFeedback(null, 'Failed to create organization.'); return }
-      setOrgName(''); setOrgDisplayName('')
+      setOrgName('')
+      setOrgDisplayName('')
+      setOrgLogoText('')
+      setOrgPrimaryColor('')
+      setOrgAccentColor('')
+      setOrgLocale('')
       await loadOrganizations(selectedRealmId)
       setFeedback('Organization created.', null)
     } finally { setCreatingOrg(false) }
+  }
+
+  const updateOrg = async (orgId: string) => {
+    if (!selectedRealmId) return
+    const draft = orgDrafts[orgId]
+    if (!draft) return
+    setSavingOrgId(orgId)
+    try {
+      const res = await fetch(`/admin/realms/${selectedRealmId}/organizations/${orgId}`, {
+        method: 'PUT',
+        headers: authHeaders(true),
+        body: JSON.stringify({
+          displayName: draft.displayName,
+          enabled: draft.enabled,
+          logoText: draft.logoText,
+          primaryColor: draft.primaryColor,
+          accentColor: draft.accentColor,
+          locale: draft.locale
+        })
+      })
+      if (!res.ok) {
+        setFeedback(null, 'Failed to update organization settings.')
+        return
+      }
+      await loadOrganizations(selectedRealmId)
+      setFeedback('Organization updated.', null)
+    } finally {
+      setSavingOrgId(null)
+    }
   }
 
   const deleteOrg = async (orgId: string) => {
@@ -512,7 +609,11 @@ export default function App() {
       const res = await fetch('/admin/realms', {
         method: 'POST',
         headers: authHeaders(true),
-        body: JSON.stringify({ name: realmName, displayName: realmDisplayName })
+        body: JSON.stringify({
+          name: realmName,
+          displayName: realmDisplayName,
+          mfaPolicy: realmMfaPolicy
+        })
       })
       if (!res.ok) {
         setFeedback(null, 'Failed to create realm.')
@@ -520,10 +621,36 @@ export default function App() {
       }
       setRealmName('')
       setRealmDisplayName('')
+      setRealmMfaPolicy('optional')
       await loadRealms()
       setFeedback('Realm created.', null)
     } finally {
       setCreatingRealm(false)
+    }
+  }
+
+  const updateRealm = async () => {
+    if (!selectedRealmId) return
+    setSavingRealm(true)
+    setFeedback(null, null)
+    try {
+      const res = await fetch(`/admin/realms/${selectedRealmId}`, {
+        method: 'PUT',
+        headers: authHeaders(true),
+        body: JSON.stringify({
+          displayName: realmEditDisplayName,
+          enabled: realmEditEnabled,
+          mfaPolicy: realmEditMfaPolicy
+        })
+      })
+      if (!res.ok) {
+        setFeedback(null, 'Failed to update realm settings.')
+        return
+      }
+      await loadRealms()
+      setFeedback('Realm updated.', null)
+    } finally {
+      setSavingRealm(false)
     }
   }
 
@@ -961,10 +1088,41 @@ export default function App() {
           <ul>
             {realms.map(r => (
               <li key={r.id}>
-                <strong>{r.name}</strong> {r.displayName ? `- ${r.displayName}` : ''} {r.enabled ? '(enabled)' : '(disabled)'}
+                <strong>{r.name}</strong> {r.displayName ? `- ${r.displayName}` : ''} {r.enabled ? '(enabled)' : '(disabled)'}{' '}
+                [MFA: {r.mfaPolicy ?? (r.mfaRequired ? 'required' : 'optional')}]
               </li>
             ))}
           </ul>
+          {selectedRealm && (
+            <>
+              <h3 style={{ marginTop: 16 }}>Selected Realm Settings</h3>
+              <div style={{ display: 'grid', gap: 8 }}>
+                <label>
+                  Display Name:
+                  <input value={realmEditDisplayName} onChange={e => setRealmEditDisplayName(e.target.value)} />
+                </label>
+                <label>
+                  MFA Policy:
+                  <select value={realmEditMfaPolicy} onChange={e => setRealmEditMfaPolicy(e.target.value)} style={{ marginLeft: 8 }}>
+                    <option value="optional">optional</option>
+                    <option value="required">required</option>
+                  </select>
+                </label>
+                <label>
+                  Enabled:
+                  <input
+                    type="checkbox"
+                    checked={realmEditEnabled}
+                    onChange={e => setRealmEditEnabled(e.target.checked)}
+                    style={{ marginLeft: 8 }}
+                  />
+                </label>
+                <button onClick={updateRealm} disabled={savingRealm || !accessToken.trim()}>
+                  {savingRealm ? 'Saving…' : 'Save realm settings'}
+                </button>
+              </div>
+            </>
+          )}
           <h3 style={{ marginTop: 16 }}>Create Realm</h3>
           <form onSubmit={createRealm}>
             <div>
@@ -977,6 +1135,15 @@ export default function App() {
               <label>
                 Display Name:
                 <input value={realmDisplayName} onChange={e => setRealmDisplayName(e.target.value)} />
+              </label>
+            </div>
+            <div>
+              <label>
+                MFA Policy:
+                <select value={realmMfaPolicy} onChange={e => setRealmMfaPolicy(e.target.value)} style={{ marginLeft: 8 }}>
+                  <option value="optional">optional</option>
+                  <option value="required">required</option>
+                </select>
               </label>
             </div>
             <button disabled={creatingRealm || !realmName || !accessToken.trim()}>Create</button>
@@ -1748,6 +1915,62 @@ export default function App() {
                   </tbody>
                 </table>
               )}
+              {organizations.length > 0 && (
+                <div style={{ marginTop: 16, display: 'grid', gap: 12 }}>
+                  <h3 style={{ marginBottom: 0 }}>Organization Branding</h3>
+                  {organizations.map(org => {
+                    const draft = orgDrafts[org.id] ?? toOrganizationDraft(org)
+                    return (
+                      <div key={`branding-${org.id}`} style={{ padding: 12, border: '1px solid #eee', borderRadius: 8 }}>
+                        <div style={{ marginBottom: 6 }}>
+                          <strong>{org.name}</strong> | current logo {org.logoText || '—'} | primary {org.primaryColor || '—'} | accent {org.accentColor || '—'} | locale {org.locale || '—'}
+                        </div>
+                        <div style={{ display: 'grid', gap: 8 }}>
+                          <input
+                            placeholder="Display name"
+                            value={draft.displayName}
+                            onChange={e => setOrgDrafts(prev => ({ ...prev, [org.id]: { ...draft, displayName: e.target.value } }))}
+                          />
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <input
+                              placeholder="Logo text"
+                              value={draft.logoText}
+                              onChange={e => setOrgDrafts(prev => ({ ...prev, [org.id]: { ...draft, logoText: e.target.value } }))}
+                            />
+                            <input
+                              placeholder="#123456"
+                              value={draft.primaryColor}
+                              onChange={e => setOrgDrafts(prev => ({ ...prev, [org.id]: { ...draft, primaryColor: e.target.value } }))}
+                            />
+                            <input
+                              placeholder="#654321"
+                              value={draft.accentColor}
+                              onChange={e => setOrgDrafts(prev => ({ ...prev, [org.id]: { ...draft, accentColor: e.target.value } }))}
+                            />
+                            <input
+                              placeholder="Locale"
+                              value={draft.locale}
+                              onChange={e => setOrgDrafts(prev => ({ ...prev, [org.id]: { ...draft, locale: e.target.value } }))}
+                            />
+                          </div>
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={draft.enabled}
+                              onChange={e => setOrgDrafts(prev => ({ ...prev, [org.id]: { ...draft, enabled: e.target.checked } }))}
+                              style={{ marginRight: 6 }}
+                            />
+                            Enabled
+                          </label>
+                          <button onClick={() => updateOrg(org.id)} disabled={savingOrgId === org.id}>
+                            {savingOrgId === org.id ? 'Saving…' : 'Save organization settings'}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
               <h3>Create organization</h3>
               <form onSubmit={createOrg} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <label>Name
@@ -1755,6 +1978,18 @@ export default function App() {
                 </label>
                 <label>Display name
                   <input value={orgDisplayName} onChange={e => setOrgDisplayName(e.target.value)} />
+                </label>
+                <label>Logo text
+                  <input value={orgLogoText} onChange={e => setOrgLogoText(e.target.value)} />
+                </label>
+                <label>Primary color
+                  <input value={orgPrimaryColor} onChange={e => setOrgPrimaryColor(e.target.value)} placeholder="#123456" />
+                </label>
+                <label>Accent color
+                  <input value={orgAccentColor} onChange={e => setOrgAccentColor(e.target.value)} placeholder="#654321" />
+                </label>
+                <label>Locale
+                  <input value={orgLocale} onChange={e => setOrgLocale(e.target.value)} placeholder="en or es" />
                 </label>
                 <button type="submit" disabled={creatingOrg || !orgName.trim() || !accessToken.trim()}>Create</button>
               </form>

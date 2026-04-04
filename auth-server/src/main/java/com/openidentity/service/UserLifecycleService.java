@@ -15,6 +15,7 @@ import java.util.UUID;
 @ApplicationScoped
 public class UserLifecycleService {
   @Inject EntityManager em;
+  @Inject ScimOutboundProvisioningService scimOutboundProvisioningService;
 
   @Transactional
   public void deleteUser(UserEntity user) {
@@ -33,6 +34,8 @@ public class UserLifecycleService {
     if (managedUser == null) {
       return;
     }
+
+    scimOutboundProvisioningService.deprovisionUser(managedUser);
 
     em.createQuery("update LoginEventEntity e set e.user = null where e.user.id = :uid")
         .setParameter("uid", userId)
@@ -63,6 +66,9 @@ public class UserLifecycleService {
         .setParameter("uid", userId)
         .executeUpdate();
     em.createQuery("delete from OrganizationMemberEntity m where m.user.id = :uid")
+        .setParameter("uid", userId)
+        .executeUpdate();
+    em.createQuery("delete from ScimOutboundUserLinkEntity l where l.user.id = :uid")
         .setParameter("uid", userId)
         .executeUpdate();
 

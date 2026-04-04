@@ -61,6 +61,7 @@ F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\ScimGroupEntity.jav
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\ScimGroupMemberEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\ScimGroupRoleMappingEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\ScimOutboundTargetEntity.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\ScimOutboundUserLinkEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\ScimProvisioningSettingsEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\ScimUserEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\SigningKeyEntity.java

@@ -8,10 +8,19 @@ public class OrganizationDtos {
   public static class CreateOrganizationRequest {
     public String name;
     public String displayName;
+    public String logoText;
+    public String primaryColor;
+    public String accentColor;
+    public String locale;
+    public Boolean enabled;
   }
 
   public static class UpdateOrganizationRequest {
     public String displayName;
+    public String logoText;
+    public String primaryColor;
+    public String accentColor;
+    public String locale;
     public Boolean enabled;
   }
 
@@ -20,16 +29,25 @@ public class OrganizationDtos {
     public UUID realmId;
     public String name;
     public String displayName;
+    public String logoText;
+    public String primaryColor;
+    public String accentColor;
+    public String locale;
     public Boolean enabled;
     public OffsetDateTime createdAt;
 
     public OrganizationResponse() {}
     public OrganizationResponse(UUID id, UUID realmId, String name, String displayName,
+        String logoText, String primaryColor, String accentColor, String locale,
         Boolean enabled, OffsetDateTime createdAt) {
       this.id = id;
       this.realmId = realmId;
       this.name = name;
       this.displayName = displayName;
+      this.logoText = logoText;
+      this.primaryColor = primaryColor;
+      this.accentColor = accentColor;
+      this.locale = locale;
       this.enabled = enabled;
       this.createdAt = createdAt;
     }

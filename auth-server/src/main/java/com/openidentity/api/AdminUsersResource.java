@@ -9,6 +9,7 @@ import com.openidentity.domain.RoleEntity;
 import com.openidentity.domain.CredentialEntity;
 import com.openidentity.domain.UserEntity;
 import com.openidentity.service.FederationPolicyService;
+import com.openidentity.service.ScimOutboundProvisioningService;
 import com.openidentity.service.ScimRoleMappingService;
 import com.openidentity.service.UserLifecycleService;
 import org.eclipse.microprofile.openapi.annotations.Operation;
@@ -39,6 +40,7 @@ public class AdminUsersResource {
   @Inject EntityManager em;
   @Inject FederationPolicyService federationPolicyService;
   @Inject ScimRoleMappingService scimRoleMappingService;
+  @Inject ScimOutboundProvisioningService scimOutboundProvisioningService;
   @Inject UserLifecycleService userLifecycleService;
 
   @GET
@@ -101,6 +103,7 @@ public class AdminUsersResource {
     u.setEnabled(req.enabled != null ? req.enabled : Boolean.TRUE);
     u.setCreatedAt(OffsetDateTime.now());
     em.persist(u);
+    scimOutboundProvisioningService.syncUserToAutoTargets(u);
     return Response.created(URI.create(String.format("/admin/realms/%s/users/%s", realmId, u.getId())))
         .entity(new UserResponse(u.getId(), realmId, u.getUsername(), u.getEmail(), u.getEnabled(),
             u.getEmailVerified(), u.getFederationSource(), u.getFederationProviderId()))
@@ -123,6 +126,7 @@ public class AdminUsersResource {
       u.setEmail(req.email);
     }
     if (req.enabled != null) u.setEnabled(req.enabled);
+    scimOutboundProvisioningService.syncUserToAutoTargets(u);
     return Response.noContent().build();
   }
 

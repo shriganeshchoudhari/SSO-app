@@ -41,6 +41,8 @@ public class AdminScimOutboundTargetsResource {
     public String baseUrl;
     public String bearerToken;
     public Boolean enabled;
+    public Boolean syncOnUserChange;
+    public Boolean deleteOnLocalDelete;
   }
 
   public static class UpdateOutboundTargetRequest {
@@ -48,6 +50,8 @@ public class AdminScimOutboundTargetsResource {
     public String baseUrl;
     public String bearerToken;
     public Boolean enabled;
+    public Boolean syncOnUserChange;
+    public Boolean deleteOnLocalDelete;
   }
 
   public static class OutboundTargetResponse {
@@ -56,6 +60,8 @@ public class AdminScimOutboundTargetsResource {
     public String name;
     public String baseUrl;
     public Boolean enabled;
+    public Boolean syncOnUserChange;
+    public Boolean deleteOnLocalDelete;
     public Boolean hasBearerToken;
     public String createdAt;
     public String lastSyncedAt;
@@ -66,6 +72,8 @@ public class AdminScimOutboundTargetsResource {
         String name,
         String baseUrl,
         Boolean enabled,
+        Boolean syncOnUserChange,
+        Boolean deleteOnLocalDelete,
         Boolean hasBearerToken,
         OffsetDateTime createdAt,
         OffsetDateTime lastSyncedAt) {
@@ -74,6 +82,8 @@ public class AdminScimOutboundTargetsResource {
       this.name = name;
       this.baseUrl = baseUrl;
       this.enabled = enabled;
+      this.syncOnUserChange = syncOnUserChange;
+      this.deleteOnLocalDelete = deleteOnLocalDelete;
       this.hasBearerToken = hasBearerToken;
       this.createdAt = createdAt != null ? createdAt.toString() : null;
       this.lastSyncedAt = lastSyncedAt != null ? lastSyncedAt.toString() : null;
@@ -141,6 +151,8 @@ public class AdminScimOutboundTargetsResource {
     target.setBaseUrl(normalizeBaseUrl(req.baseUrl));
     target.setBearerToken(secretProtectionService.protectOpaqueSecret(req.bearerToken));
     target.setEnabled(req.enabled != null ? req.enabled : Boolean.TRUE);
+    target.setSyncOnUserChange(req.syncOnUserChange != null ? req.syncOnUserChange : Boolean.FALSE);
+    target.setDeleteOnLocalDelete(req.deleteOnLocalDelete != null ? req.deleteOnLocalDelete : Boolean.FALSE);
     target.setCreatedAt(OffsetDateTime.now());
     em.persist(target);
 
@@ -181,6 +193,12 @@ public class AdminScimOutboundTargetsResource {
     if (req.enabled != null) {
       target.setEnabled(req.enabled);
     }
+    if (req.syncOnUserChange != null) {
+      target.setSyncOnUserChange(req.syncOnUserChange);
+    }
+    if (req.deleteOnLocalDelete != null) {
+      target.setDeleteOnLocalDelete(req.deleteOnLocalDelete);
+    }
     return toResponse(target);
   }
 
@@ -191,6 +209,9 @@ public class AdminScimOutboundTargetsResource {
   public Response delete(
       @PathParam("realmId") UUID realmId, @PathParam("targetId") UUID targetId) {
     ScimOutboundTargetEntity target = requireTarget(realmId, targetId);
+    em.createQuery("delete from ScimOutboundUserLinkEntity l where l.target.id = :targetId")
+        .setParameter("targetId", targetId)
+        .executeUpdate();
     em.remove(target);
     return Response.noContent().build();
   }
@@ -264,6 +285,8 @@ public class AdminScimOutboundTargetsResource {
         target.getName(),
         target.getBaseUrl(),
         target.getEnabled(),
+        target.getSyncOnUserChange(),
+        target.getDeleteOnLocalDelete(),
         target.getBearerToken() != null && !target.getBearerToken().isBlank(),
         target.getCreatedAt(),
         target.getLastSyncedAt());

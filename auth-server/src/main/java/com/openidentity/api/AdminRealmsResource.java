@@ -2,6 +2,7 @@ package com.openidentity.api;
 
 import com.openidentity.api.dto.RealmDtos.CreateRealmRequest;
 import com.openidentity.api.dto.RealmDtos.RealmResponse;
+import com.openidentity.api.dto.RealmDtos.UpdateRealmRequest;
 import com.openidentity.domain.RealmEntity;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
@@ -23,6 +24,8 @@ import java.util.stream.Collectors;
 @Consumes(MediaType.APPLICATION_JSON)
 @Tag(name = "Realms", description = "Realm management")
 public class AdminRealmsResource {
+  private static final String MFA_POLICY_OPTIONAL = "optional";
+  private static final String MFA_POLICY_REQUIRED = "required";
 
   @Inject EntityManager em;
 
@@ -34,7 +37,7 @@ public class AdminRealmsResource {
     q.setFirstResult(first);
     q.setMaxResults(max);
     return q.getResultList().stream()
-        .map(r -> new RealmResponse(r.getId(), r.getName(), r.getDisplayName(), r.getEnabled()))
+        .map(this::toResponse)
         .collect(Collectors.toList());
   }
 
@@ -46,7 +49,7 @@ public class AdminRealmsResource {
     if (r == null) {
       throw new NotFoundException("Realm not found");
     }
-    return new RealmResponse(r.getId(), r.getName(), r.getDisplayName(), r.getEnabled());
+    return toResponse(r);
   }
 
   @POST
@@ -60,12 +63,43 @@ public class AdminRealmsResource {
     r.setId(UUID.randomUUID());
     r.setName(req.name);
     r.setDisplayName(req.displayName);
-    r.setEnabled(Boolean.TRUE);
+    String mfaPolicy = normalizeMfaPolicy(req.mfaPolicy, req.mfaRequired);
+    r.setEnabled(req.enabled != null ? req.enabled : Boolean.TRUE);
+    r.setMfaPolicy(mfaPolicy);
+    r.setMfaRequired(isMfaRequired(mfaPolicy, req.mfaRequired));
     r.setCreatedAt(OffsetDateTime.now());
     em.persist(r);
     return Response.created(URI.create("/admin/realms/" + r.getId())).entity(
-        new RealmResponse(r.getId(), r.getName(), r.getDisplayName(), r.getEnabled())
+        toResponse(r)
     ).build();
+  }
+
+  @PUT
+  @Path("/{id}")
+  @Operation(summary = "Update realm")
+  @Transactional
+  public RealmResponse update(@PathParam("id") UUID id, UpdateRealmRequest req) {
+    if (req == null) {
+      throw new BadRequestException("Request body required");
+    }
+    RealmEntity r = em.find(RealmEntity.class, id);
+    if (r == null) {
+      throw new NotFoundException("Realm not found");
+    }
+    if (req.displayName != null) {
+      r.setDisplayName(req.displayName.isBlank() ? null : req.displayName.trim());
+    }
+    if (req.enabled != null) {
+      r.setEnabled(req.enabled);
+    }
+    if (req.mfaPolicy != null || req.mfaRequired != null) {
+      String mfaPolicy = normalizeMfaPolicy(req.mfaPolicy != null ? req.mfaPolicy : r.getMfaPolicy(),
+          req.mfaRequired != null ? req.mfaRequired : r.getMfaRequired());
+      r.setMfaPolicy(mfaPolicy);
+      r.setMfaRequired(isMfaRequired(mfaPolicy, req.mfaRequired != null ? req.mfaRequired : r.getMfaRequired()));
+    }
+    em.merge(r);
+    return toResponse(r);
   }
 
   @DELETE
@@ -79,5 +113,25 @@ public class AdminRealmsResource {
     }
     em.remove(r);
     return Response.noContent().build();
+  }
+
+  private RealmResponse toResponse(RealmEntity realm) {
+    return new RealmResponse(realm.getId(), realm.getName(), realm.getDisplayName(),
+        realm.getEnabled(), realm.getMfaRequired(), realm.getMfaPolicy());
+  }
+
+  private String normalizeMfaPolicy(String value, Boolean mfaRequired) {
+    String normalized = value == null || value.isBlank() ? MFA_POLICY_OPTIONAL : value.trim().toLowerCase();
+    if (!MFA_POLICY_OPTIONAL.equals(normalized) && !MFA_POLICY_REQUIRED.equals(normalized)) {
+      throw new BadRequestException("mfaPolicy must be 'optional' or 'required'");
+    }
+    if (Boolean.TRUE.equals(mfaRequired)) {
+      return MFA_POLICY_REQUIRED;
+    }
+    return normalized;
+  }
+
+  private boolean isMfaRequired(String mfaPolicy, Boolean requestedMfaRequired) {
+    return MFA_POLICY_REQUIRED.equals(mfaPolicy) || Boolean.TRUE.equals(requestedMfaRequired);
   }
 }

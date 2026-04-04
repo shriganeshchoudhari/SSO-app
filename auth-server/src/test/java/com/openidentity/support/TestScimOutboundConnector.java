@@ -13,14 +13,21 @@ import java.util.concurrent.ConcurrentHashMap;
 @ApplicationScoped
 public class TestScimOutboundConnector implements ScimOutboundConnector {
   private static final Map<UUID, Map<String, Map<String, Object>>> SYNCED_USERS = new ConcurrentHashMap<>();
+  private static final Map<UUID, Map<String, Boolean>> DELETED_USERS = new ConcurrentHashMap<>();
 
   public static void reset() {
     SYNCED_USERS.clear();
+    DELETED_USERS.clear();
   }
 
   public static Map<String, Object> payload(UUID targetId, String externalId) {
     Map<String, Map<String, Object>> targetPayloads = SYNCED_USERS.get(targetId);
     return targetPayloads != null ? targetPayloads.get(externalId) : null;
+  }
+
+  public static boolean wasDeleted(UUID targetId, String externalId) {
+    Map<String, Boolean> targetDeletes = DELETED_USERS.get(targetId);
+    return targetDeletes != null && Boolean.TRUE.equals(targetDeletes.get(externalId));
   }
 
   @Override
@@ -38,6 +45,24 @@ public class TestScimOutboundConnector implements ScimOutboundConnector {
     boolean created = !targetPayloads.containsKey(externalId);
     targetPayloads.put(externalId, copy(scimUser));
     return new UpsertResult(created, "remote-" + externalId);
+  }
+
+  @Override
+  public boolean deleteUser(
+      ScimOutboundTargetEntity target, String remoteUserId, String externalId, String bearerToken) {
+    if (Boolean.FALSE.equals(target.getEnabled())) {
+      return false;
+    }
+    if (bearerToken == null || bearerToken.isBlank()) {
+      throw new IllegalStateException("Missing bearer token");
+    }
+    DELETED_USERS.computeIfAbsent(target.getId(), ignored -> new ConcurrentHashMap<>())
+        .put(externalId, Boolean.TRUE);
+    Map<String, Map<String, Object>> targetPayloads = SYNCED_USERS.get(target.getId());
+    if (targetPayloads != null) {
+      targetPayloads.remove(externalId);
+    }
+    return true;
   }
 
   private Map<String, Object> copy(Map<String, Object> payload) {

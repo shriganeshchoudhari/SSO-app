@@ -8,4 +8,7 @@ public interface ScimOutboundConnector {
 
   UpsertResult upsertUser(
       ScimOutboundTargetEntity target, Map<String, Object> scimUser, String bearerToken);
+
+  boolean deleteUser(
+      ScimOutboundTargetEntity target, String remoteUserId, String externalId, String bearerToken);
 }

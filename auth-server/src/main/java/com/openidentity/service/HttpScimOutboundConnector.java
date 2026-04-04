@@ -52,9 +52,43 @@ public class HttpScimOutboundConnector implements ScimOutboundConnector {
       JsonNode payload = parseBody(response);
       String remoteId = payload != null && payload.hasNonNull("id") ? payload.get("id").asText() : null;
       return new UpsertResult(true, remoteId);
-    } catch (IOException | InterruptedException e) {
+    } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IllegalStateException("Failed to sync outbound SCIM user", e);
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to sync outbound SCIM user", e);
+    }
+  }
+
+  @Override
+  public boolean deleteUser(
+      ScimOutboundTargetEntity target, String remoteUserId, String externalId, String bearerToken) {
+    try {
+      String effectiveRemoteId = remoteUserId;
+      if (effectiveRemoteId == null || effectiveRemoteId.isBlank()) {
+        ExistingRemoteUser existingRemoteUser = lookupExistingUser(target, externalId, bearerToken);
+        if (existingRemoteUser == null) {
+          return false;
+        }
+        effectiveRemoteId = existingRemoteUser.id();
+      }
+
+      HttpRequest request =
+          authorizedRequest(target, "/Users/" + effectiveRemoteId, bearerToken)
+              .DELETE()
+              .build();
+      HttpResponse<String> response =
+          httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+      if (response.statusCode() == 404) {
+        return false;
+      }
+      ensureSuccess(response, 200, 204);
+      return true;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Failed to delete outbound SCIM user", e);
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to delete outbound SCIM user", e);
     }
   }
 

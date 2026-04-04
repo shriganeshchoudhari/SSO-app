@@ -37,6 +37,12 @@ public class ScimOutboundTargetEntity {
   @Column(name = "enabled", nullable = false)
   private Boolean enabled = Boolean.TRUE;
 
+  @Column(name = "sync_on_user_change", nullable = false)
+  private Boolean syncOnUserChange = Boolean.FALSE;
+
+  @Column(name = "delete_on_local_delete", nullable = false)
+  private Boolean deleteOnLocalDelete = Boolean.FALSE;
+
   @Column(name = "created_at", nullable = false)
   private OffsetDateTime createdAt;
 
@@ -91,6 +97,14 @@ public class ScimOutboundTargetEntity {
     this.enabled = enabled;
   }
 
+  public Boolean getSyncOnUserChange() {
+    return syncOnUserChange;
+  }
+
+  public void setSyncOnUserChange(Boolean syncOnUserChange) {
+    this.syncOnUserChange = syncOnUserChange;
+  }
+
   public OffsetDateTime getCreatedAt() {
     return createdAt;
   }
@@ -105,5 +119,13 @@ public class ScimOutboundTargetEntity {
 
   public void setLastSyncedAt(OffsetDateTime lastSyncedAt) {
     this.lastSyncedAt = lastSyncedAt;
+  }
+
+  public Boolean getDeleteOnLocalDelete() {
+    return deleteOnLocalDelete;
+  }
+
+  public void setDeleteOnLocalDelete(Boolean deleteOnLocalDelete) {
+    this.deleteOnLocalDelete = deleteOnLocalDelete;
   }
 }

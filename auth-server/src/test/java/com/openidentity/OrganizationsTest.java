@@ -7,6 +7,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -203,5 +204,69 @@ public class OrganizationsTest {
         .body(Map.of("userId", userId, "orgRole", "superuser"))
         .when().post("/admin/realms/" + realmId + "/organizations/" + orgId + "/members")
         .then().statusCode(400);
+  }
+
+  @Test
+  void organization_branding_is_persisted_and_applied_to_hosted_login() {
+    String realmId = createRealm("orgrealmBrand");
+
+    Response createResp = adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.of(
+            "name", "acme-brand",
+            "displayName", "Acme Brand",
+            "logoText", "AC",
+            "primaryColor", "#123456",
+            "accentColor", "#654321",
+            "locale", "es"))
+        .when().post("/admin/realms/" + realmId + "/organizations")
+        .then()
+        .statusCode(anyOf(is(200), is(201)))
+        .body("logoText", equalTo("AC"))
+        .body("primaryColor", equalTo("#123456"))
+        .body("accentColor", equalTo("#654321"))
+        .body("locale", equalTo("es"))
+        .extract().response();
+
+    String orgId = createResp.jsonPath().getString("id");
+
+    adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.of(
+            "clientId", "brand-client",
+            "protocol", "openid-connect",
+            "publicClient", true,
+            "redirectUris", List.of("https://brand.example.com/callback"),
+            "grantTypes", List.of("authorization_code")))
+        .when().post("/admin/realms/" + realmId + "/clients")
+        .then().statusCode(anyOf(is(200), is(201)));
+
+    adminRequest()
+        .when().get("/admin/realms/" + realmId + "/organizations/" + orgId)
+        .then()
+        .statusCode(200)
+        .body("logoText", equalTo("AC"))
+        .body("primaryColor", equalTo("#123456"))
+        .body("accentColor", equalTo("#654321"))
+        .body("locale", equalTo("es"));
+
+    given()
+        .when()
+        .get("/auth/realms/orgrealmBrand/protocol/openid-connect/auth"
+            + "?response_type=code"
+            + "&client_id=brand-client"
+            + "&redirect_uri=https://brand.example.com/callback"
+            + "&scope=openid"
+            + "&state=brand-state"
+            + "&code_challenge=plain-challenge"
+            + "&code_challenge_method=plain"
+            + "&organization=acme-brand")
+        .then()
+        .statusCode(200)
+        .body(containsString("lang=\"es\""))
+        .body(containsString("Acme Brand"))
+        .body(containsString("#123456"))
+        .body(containsString("#654321"))
+        .body(containsString(">AC<"));
   }
 }
