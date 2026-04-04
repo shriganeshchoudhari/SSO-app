@@ -42,7 +42,9 @@ public class AdminScimOutboundTargetsResource {
     public String bearerToken;
     public Boolean enabled;
     public Boolean syncOnUserChange;
+    public Boolean syncOnGroupChange;
     public Boolean deleteOnLocalDelete;
+    public Boolean deleteGroupOnLocalDelete;
   }
 
   public static class UpdateOutboundTargetRequest {
@@ -51,7 +53,9 @@ public class AdminScimOutboundTargetsResource {
     public String bearerToken;
     public Boolean enabled;
     public Boolean syncOnUserChange;
+    public Boolean syncOnGroupChange;
     public Boolean deleteOnLocalDelete;
+    public Boolean deleteGroupOnLocalDelete;
   }
 
   public static class OutboundTargetResponse {
@@ -61,7 +65,9 @@ public class AdminScimOutboundTargetsResource {
     public String baseUrl;
     public Boolean enabled;
     public Boolean syncOnUserChange;
+    public Boolean syncOnGroupChange;
     public Boolean deleteOnLocalDelete;
+    public Boolean deleteGroupOnLocalDelete;
     public Boolean hasBearerToken;
     public String createdAt;
     public String lastSyncedAt;
@@ -73,7 +79,9 @@ public class AdminScimOutboundTargetsResource {
         String baseUrl,
         Boolean enabled,
         Boolean syncOnUserChange,
+        Boolean syncOnGroupChange,
         Boolean deleteOnLocalDelete,
+        Boolean deleteGroupOnLocalDelete,
         Boolean hasBearerToken,
         OffsetDateTime createdAt,
         OffsetDateTime lastSyncedAt) {
@@ -83,7 +91,9 @@ public class AdminScimOutboundTargetsResource {
       this.baseUrl = baseUrl;
       this.enabled = enabled;
       this.syncOnUserChange = syncOnUserChange;
+      this.syncOnGroupChange = syncOnGroupChange;
       this.deleteOnLocalDelete = deleteOnLocalDelete;
+      this.deleteGroupOnLocalDelete = deleteGroupOnLocalDelete;
       this.hasBearerToken = hasBearerToken;
       this.createdAt = createdAt != null ? createdAt.toString() : null;
       this.lastSyncedAt = lastSyncedAt != null ? lastSyncedAt.toString() : null;
@@ -101,6 +111,21 @@ public class AdminScimOutboundTargetsResource {
       this.processedUsers = result.processedUsers();
       this.createdUsers = result.createdUsers();
       this.updatedUsers = result.updatedUsers();
+      this.lastSyncedAt = lastSyncedAt != null ? lastSyncedAt.toString() : null;
+    }
+  }
+
+  public static class SyncGroupsResponse {
+    public int processedGroups;
+    public int createdGroups;
+    public int updatedGroups;
+    public String lastSyncedAt;
+
+    public SyncGroupsResponse(
+        ScimOutboundProvisioningService.SyncGroupsResult result, OffsetDateTime lastSyncedAt) {
+      this.processedGroups = result.processedGroups();
+      this.createdGroups = result.createdGroups();
+      this.updatedGroups = result.updatedGroups();
       this.lastSyncedAt = lastSyncedAt != null ? lastSyncedAt.toString() : null;
     }
   }
@@ -152,7 +177,10 @@ public class AdminScimOutboundTargetsResource {
     target.setBearerToken(secretProtectionService.protectOpaqueSecret(req.bearerToken));
     target.setEnabled(req.enabled != null ? req.enabled : Boolean.TRUE);
     target.setSyncOnUserChange(req.syncOnUserChange != null ? req.syncOnUserChange : Boolean.FALSE);
+    target.setSyncOnGroupChange(req.syncOnGroupChange != null ? req.syncOnGroupChange : Boolean.FALSE);
     target.setDeleteOnLocalDelete(req.deleteOnLocalDelete != null ? req.deleteOnLocalDelete : Boolean.FALSE);
+    target.setDeleteGroupOnLocalDelete(
+        req.deleteGroupOnLocalDelete != null ? req.deleteGroupOnLocalDelete : Boolean.FALSE);
     target.setCreatedAt(OffsetDateTime.now());
     em.persist(target);
 
@@ -196,8 +224,14 @@ public class AdminScimOutboundTargetsResource {
     if (req.syncOnUserChange != null) {
       target.setSyncOnUserChange(req.syncOnUserChange);
     }
+    if (req.syncOnGroupChange != null) {
+      target.setSyncOnGroupChange(req.syncOnGroupChange);
+    }
     if (req.deleteOnLocalDelete != null) {
       target.setDeleteOnLocalDelete(req.deleteOnLocalDelete);
+    }
+    if (req.deleteGroupOnLocalDelete != null) {
+      target.setDeleteGroupOnLocalDelete(req.deleteGroupOnLocalDelete);
     }
     return toResponse(target);
   }
@@ -210,6 +244,9 @@ public class AdminScimOutboundTargetsResource {
       @PathParam("realmId") UUID realmId, @PathParam("targetId") UUID targetId) {
     ScimOutboundTargetEntity target = requireTarget(realmId, targetId);
     em.createQuery("delete from ScimOutboundUserLinkEntity l where l.target.id = :targetId")
+        .setParameter("targetId", targetId)
+        .executeUpdate();
+    em.createQuery("delete from ScimOutboundGroupLinkEntity l where l.target.id = :targetId")
         .setParameter("targetId", targetId)
         .executeUpdate();
     em.remove(target);
@@ -226,6 +263,18 @@ public class AdminScimOutboundTargetsResource {
         scimOutboundProvisioningService.syncUsers(realmId, targetId);
     ScimOutboundTargetEntity target = requireTarget(realmId, targetId);
     return new SyncUsersResponse(result, target.getLastSyncedAt());
+  }
+
+  @POST
+  @Path("/{targetId}/sync-groups")
+  @Consumes(MediaType.WILDCARD)
+  @Operation(summary = "Push current SCIM groups to outbound SCIM target")
+  public SyncGroupsResponse syncGroups(
+      @PathParam("realmId") UUID realmId, @PathParam("targetId") UUID targetId) {
+    ScimOutboundProvisioningService.SyncGroupsResult result =
+        scimOutboundProvisioningService.syncGroups(realmId, targetId);
+    ScimOutboundTargetEntity target = requireTarget(realmId, targetId);
+    return new SyncGroupsResponse(result, target.getLastSyncedAt());
   }
 
   private void validateCreate(CreateOutboundTargetRequest req) {
@@ -286,7 +335,9 @@ public class AdminScimOutboundTargetsResource {
         target.getBaseUrl(),
         target.getEnabled(),
         target.getSyncOnUserChange(),
+        target.getSyncOnGroupChange(),
         target.getDeleteOnLocalDelete(),
+        target.getDeleteGroupOnLocalDelete(),
         target.getBearerToken() != null && !target.getBearerToken().isBlank(),
         target.getCreatedAt(),
         target.getLastSyncedAt());

@@ -60,6 +60,7 @@ F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\SamlIdentityProvide
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\ScimGroupEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\ScimGroupMemberEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\ScimGroupRoleMappingEntity.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\ScimOutboundGroupLinkEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\ScimOutboundTargetEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\ScimOutboundUserLinkEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\ScimProvisioningSettingsEntity.java
@@ -76,6 +77,7 @@ F:\SSO-app\auth-server\src\main\java\com\openidentity\health\JwtSigningReadiness
 F:\SSO-app\auth-server\src\main\java\com\openidentity\health\SecretProtectionReadinessCheck.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\jobs\LdapReconciliationJob.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\jobs\ObservabilityRefreshJob.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\jobs\ScimOutboundReconciliationJob.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\jobs\SessionCleanupJob.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\security\TokenValidationService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\security\VerifiedToken.java

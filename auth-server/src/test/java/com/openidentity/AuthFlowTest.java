@@ -191,4 +191,62 @@ public class AuthFlowTest {
         .then().statusCode(401)
         .body(containsString("requires an enrolled authenticator"));
   }
+
+  @Test
+  void verified_bearer_requests_refresh_session_last_refresh() throws Exception {
+    Response realmResp = adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.of("name", "session-touch", "displayName", "Session Touch"))
+        .when().post("/admin/realms")
+        .then().statusCode(anyOf(is(200), is(201)))
+        .extract().response();
+    String realmId = realmResp.jsonPath().getString("id");
+
+    Response userResp = adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.of("username", "touch-user", "email", "touch-user@example.com", "enabled", true))
+        .when().post("/admin/realms/" + realmId + "/users")
+        .then().statusCode(anyOf(is(200), is(201)))
+        .extract().response();
+    String userId = userResp.jsonPath().getString("id");
+
+    adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.of("password", "Secret123!"))
+        .when().post("/admin/realms/" + realmId + "/users/" + userId + "/credentials/password")
+        .then().statusCode(anyOf(is(200), is(201), is(204)));
+
+    String accessToken = given()
+        .contentType("application/x-www-form-urlencoded")
+        .formParam("grant_type", "password")
+        .formParam("client_id", "web-app")
+        .formParam("username", "touch-user")
+        .formParam("password", "Secret123!")
+        .when().post("/auth/realms/session-touch/protocol/openid-connect/token")
+        .then().statusCode(200)
+        .extract().jsonPath().getString("access_token");
+
+    Response initialSessions = given()
+        .header("Authorization", "Bearer " + accessToken)
+        .when().get("/account/sessions")
+        .then().statusCode(200)
+        .extract().response();
+    String sessionId = initialSessions.jsonPath().getString("[0].id");
+    String initialLastRefresh = initialSessions.jsonPath().getString("[0].lastRefresh");
+
+    Thread.sleep(1100L);
+
+    given()
+        .header("Authorization", "Bearer " + accessToken)
+        .when().get("/account/profile")
+        .then().statusCode(200)
+        .body("username", equalTo("touch-user"));
+
+    given()
+        .header("Authorization", "Bearer " + accessToken)
+        .when().get("/account/sessions")
+        .then().statusCode(200)
+        .body("[0].id", equalTo(sessionId))
+        .body("[0].lastRefresh", not(equalTo(initialLastRefresh)));
+  }
 }

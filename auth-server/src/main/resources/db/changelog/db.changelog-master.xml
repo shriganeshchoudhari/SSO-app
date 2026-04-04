@@ -844,4 +844,74 @@
         </preConditions>
         <sqlFile relativeToChangelogFile="true" path="0024-scim-outbound-auto-sync-oracle.sql" endDelimiter=";" splitStatements="true" />
     </changeSet>
+
+    <changeSet id="0025-scim-outbound-group-links-postgresql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0025-scim-outbound-group-links.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0025-scim-outbound-group-links-h2" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="h2"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0025-scim-outbound-group-links-h2.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0025-scim-outbound-group-links-mysql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mysql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0025-scim-outbound-group-links-mysql.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0025-scim-outbound-group-links-mariadb" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mariadb"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0025-scim-outbound-group-links-mariadb.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0025-scim-outbound-group-links-oracle" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="oracle"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0025-scim-outbound-group-links-oracle.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0026-scim-outbound-group-lifecycle-postgresql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0026-scim-outbound-group-lifecycle.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0026-scim-outbound-group-lifecycle-h2" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="h2"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0026-scim-outbound-group-lifecycle-h2.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0026-scim-outbound-group-lifecycle-mysql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mysql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0026-scim-outbound-group-lifecycle-mysql.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0026-scim-outbound-group-lifecycle-mariadb" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mariadb"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0026-scim-outbound-group-lifecycle-mariadb.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0026-scim-outbound-group-lifecycle-oracle" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="oracle"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0026-scim-outbound-group-lifecycle-oracle.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
 </databaseChangeLog>

@@ -4,6 +4,7 @@ import com.openidentity.domain.RealmEntity;
 import com.openidentity.domain.ScimGroupEntity;
 import com.openidentity.domain.ScimGroupMemberEntity;
 import com.openidentity.domain.ScimUserEntity;
+import com.openidentity.service.ScimOutboundProvisioningService;
 import com.openidentity.service.ScimProvisioningService;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -59,6 +60,7 @@ public class ScimResource {
 
   @Inject EntityManager em;
   @Inject ScimProvisioningService scimProvisioningService;
+  @Inject ScimOutboundProvisioningService scimOutboundProvisioningService;
 
   // ── Service provider config ────────────────────────────────────────────────
 
@@ -413,6 +415,7 @@ public class ScimResource {
     em.persist(group);
 
     persistGroupMembers(group, body);
+    scimOutboundProvisioningService.syncGroupToAutoTargets(group);
     return Response.status(201).entity(toScimGroup(group, realmName)).build();
   }
 
@@ -458,6 +461,7 @@ public class ScimResource {
     group.setLastSyncedAt(OffsetDateTime.now());
     em.merge(group);
     replaceGroupMembers(group, body.get("members"));
+    scimOutboundProvisioningService.syncGroupToAutoTargets(group);
     return Response.ok(toScimGroup(group, realmName)).build();
   }
 
@@ -490,6 +494,7 @@ public class ScimResource {
 
     group.setLastSyncedAt(OffsetDateTime.now());
     em.merge(group);
+    scimOutboundProvisioningService.syncGroupToAutoTargets(group);
     return Response.ok(toScimGroup(group, realmName)).build();
   }
 
@@ -505,6 +510,7 @@ public class ScimResource {
     requireRealm(realmName);
     ScimGroupEntity group = em.find(ScimGroupEntity.class, id);
     if (group == null) return scimError(404, "Group not found");
+    scimOutboundProvisioningService.deprovisionGroup(group);
     em.remove(group);
     return Response.noContent().build();
   }

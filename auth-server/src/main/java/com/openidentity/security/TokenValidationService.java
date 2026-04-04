@@ -6,6 +6,7 @@ import com.openidentity.domain.SigningKeyEntity;
 import com.openidentity.domain.UserSessionEntity;
 import com.openidentity.service.JwtKeyService;
 import com.openidentity.service.SecretProtectionService;
+import com.openidentity.service.SessionService;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -37,6 +38,7 @@ public class TokenValidationService {
   @Inject ObjectMapper objectMapper;
   @Inject JwtKeyService jwtKeyService;
   @Inject SecretProtectionService secretProtectionService;
+  @Inject SessionService sessionService;
 
   @ConfigProperty(name = "smallrye.jwt.sign.key")
   Optional<String> signKey;
@@ -100,6 +102,7 @@ public class TokenValidationService {
             || !session.getRealm().getId().equals(realmId)) {
           throw unauthorized("invalid_session");
         }
+        sessionService.touchIfActive(sessionId);
       }
 
       return new VerifiedToken(userId, username, realmId, realmName, sessionId, admin, claims, roles);

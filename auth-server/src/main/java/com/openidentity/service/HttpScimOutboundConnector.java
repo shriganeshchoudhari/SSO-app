@@ -63,18 +63,34 @@ public class HttpScimOutboundConnector implements ScimOutboundConnector {
   @Override
   public boolean deleteUser(
       ScimOutboundTargetEntity target, String remoteUserId, String externalId, String bearerToken) {
+    return deleteRemoteResource(target, "/Users", remoteUserId, externalId, bearerToken);
+  }
+
+  @Override
+  public boolean deleteGroup(
+      ScimOutboundTargetEntity target, String remoteGroupId, String externalId, String bearerToken) {
+    return deleteRemoteResource(target, "/Groups", remoteGroupId, externalId, bearerToken);
+  }
+
+  private boolean deleteRemoteResource(
+      ScimOutboundTargetEntity target,
+      String resourcePath,
+      String remoteId,
+      String externalId,
+      String bearerToken) {
     try {
-      String effectiveRemoteId = remoteUserId;
+      String effectiveRemoteId = remoteId;
       if (effectiveRemoteId == null || effectiveRemoteId.isBlank()) {
-        ExistingRemoteUser existingRemoteUser = lookupExistingUser(target, externalId, bearerToken);
-        if (existingRemoteUser == null) {
+        ExistingRemoteResource existingRemoteResource =
+            lookupExistingResource(target, resourcePath, externalId, bearerToken);
+        if (existingRemoteResource == null) {
           return false;
         }
-        effectiveRemoteId = existingRemoteUser.id();
+        effectiveRemoteId = existingRemoteResource.id();
       }
 
       HttpRequest request =
-          authorizedRequest(target, "/Users/" + effectiveRemoteId, bearerToken)
+          authorizedRequest(target, resourcePath + "/" + effectiveRemoteId, bearerToken)
               .DELETE()
               .build();
       HttpResponse<String> response =
@@ -92,12 +108,56 @@ public class HttpScimOutboundConnector implements ScimOutboundConnector {
     }
   }
 
+  @Override
+  public UpsertResult upsertGroup(
+      ScimOutboundTargetEntity target, Map<String, Object> scimGroup, String bearerToken) {
+    try {
+      String externalId = String.valueOf(scimGroup.get("externalId"));
+      ExistingRemoteResource existingRemoteGroup =
+          lookupExistingResource(target, "/Groups", externalId, bearerToken);
+      String body = objectMapper.writeValueAsString(scimGroup);
+      if (existingRemoteGroup != null) {
+        HttpRequest request =
+            authorizedRequest(target, "/Groups/" + existingRemoteGroup.id(), bearerToken)
+                .PUT(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+        HttpResponse<String> response =
+            httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        ensureSuccess(response, 200, 201, 204);
+        return new UpsertResult(false, existingRemoteGroup.id());
+      }
+
+      HttpRequest request =
+          authorizedRequest(target, "/Groups", bearerToken)
+              .POST(HttpRequest.BodyPublishers.ofString(body))
+              .build();
+      HttpResponse<String> response =
+          httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+      ensureSuccess(response, 200, 201);
+      JsonNode payload = parseBody(response);
+      String remoteId = payload != null && payload.hasNonNull("id") ? payload.get("id").asText() : null;
+      return new UpsertResult(true, remoteId);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Failed to sync outbound SCIM group", e);
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to sync outbound SCIM group", e);
+    }
+  }
+
   private ExistingRemoteUser lookupExistingUser(
       ScimOutboundTargetEntity target, String externalId, String bearerToken)
       throws IOException, InterruptedException {
+    ExistingRemoteResource resource = lookupExistingResource(target, "/Users", externalId, bearerToken);
+    return resource != null ? new ExistingRemoteUser(resource.id()) : null;
+  }
+
+  private ExistingRemoteResource lookupExistingResource(
+      ScimOutboundTargetEntity target, String resourcePath, String externalId, String bearerToken)
+      throws IOException, InterruptedException {
     String filter = URLEncoder.encode("externalId eq \"" + externalId + "\"", StandardCharsets.UTF_8);
     HttpRequest request =
-        authorizedRequest(target, "/Users?filter=" + filter, bearerToken).GET().build();
+        authorizedRequest(target, resourcePath + "?filter=" + filter, bearerToken).GET().build();
     HttpResponse<String> response =
         httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
     ensureSuccess(response, 200);
@@ -109,7 +169,7 @@ public class HttpScimOutboundConnector implements ScimOutboundConnector {
     if (!resources.isArray() || resources.isEmpty() || !resources.get(0).hasNonNull("id")) {
       return null;
     }
-    return new ExistingRemoteUser(resources.get(0).get("id").asText());
+    return new ExistingRemoteResource(resources.get(0).get("id").asText());
   }
 
   private HttpRequest.Builder authorizedRequest(
@@ -150,4 +210,5 @@ public class HttpScimOutboundConnector implements ScimOutboundConnector {
   }
 
   private record ExistingRemoteUser(String id) {}
+  private record ExistingRemoteResource(String id) {}
 }

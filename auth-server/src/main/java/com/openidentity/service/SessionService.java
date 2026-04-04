@@ -7,10 +7,14 @@ import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 @ApplicationScoped
 public class SessionService {
   @Inject EntityManager em;
+
+  @ConfigProperty(name = "openidentity.session.touch-min-interval-seconds", defaultValue = "30")
+  long touchMinIntervalSeconds;
 
   @Transactional
   public UserSessionEntity createUserSession(RealmEntity realm, UserEntity user) {
@@ -44,6 +48,24 @@ public class SessionService {
     UserSessionEntity managedSession = em.find(UserSessionEntity.class, us.getId());
     if (managedSession != null) {
       managedSession.setLastRefresh(OffsetDateTime.now());
+    }
+  }
+
+  @Transactional
+  public void touchIfActive(UUID sessionId) {
+    if (sessionId == null) {
+      return;
+    }
+    UserSessionEntity managedSession = em.find(UserSessionEntity.class, sessionId);
+    if (managedSession == null) {
+      return;
+    }
+    OffsetDateTime now = OffsetDateTime.now();
+    OffsetDateTime lastRefresh = managedSession.getLastRefresh();
+    if (lastRefresh == null
+        || touchMinIntervalSeconds <= 0
+        || lastRefresh.plusSeconds(touchMinIntervalSeconds).isBefore(now)) {
+      managedSession.setLastRefresh(now);
     }
   }
 
