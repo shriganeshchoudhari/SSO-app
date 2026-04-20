@@ -47,6 +47,7 @@ F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\CredentialEntity.ja
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\EmailVerificationTokenEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\LdapProviderEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\LoginEventEntity.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\OidcConsentStateEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\OidcIdentityProviderEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\OrganizationEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\OrganizationMemberEntity.java
@@ -66,6 +67,7 @@ F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\ScimOutboundUserLin
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\ScimProvisioningSettingsEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\ScimUserEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\SigningKeyEntity.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\UserConsentEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\UserEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\UserRoleEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\UserRoleId.java
@@ -96,6 +98,7 @@ F:\SSO-app\auth-server\src\main\java\com\openidentity\service\ObservabilityServi
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\OidcBrokerConnector.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\OidcBrokerService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\OidcClientService.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\service\OidcConsentService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\OidcGrantService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\RateLimitService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\SamlAssertionService.java

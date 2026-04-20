@@ -5,7 +5,6 @@ import com.openidentity.domain.RealmEntity;
 import com.openidentity.domain.SamlBrokerLoginStateEntity;
 import com.openidentity.domain.SamlIdentityProviderEntity;
 import com.openidentity.domain.UserEntity;
-import com.openidentity.domain.UserSessionEntity;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -26,10 +25,8 @@ import java.util.UUID;
 public class SamlBrokerService {
   @Inject EntityManager em;
   @Inject SamlAssertionService samlAssertionService;
-  @Inject OidcGrantService oidcGrantService;
-  @Inject SessionService sessionService;
+  @Inject OidcConsentService oidcConsentService;
   @Inject FederationPolicyService federationPolicyService;
-  @Inject EventService eventService;
   @Inject SamlSpKeyService samlSpKeyService;
 
   public record SamlBrokerCallbackResult(URI clientRedirect, UserEntity user) {}
@@ -93,31 +90,23 @@ public class SamlBrokerService {
       throw samlError("invalid_request", Response.Status.BAD_REQUEST);
     }
     UserEntity user = findOrProvisionUser(realm, provider, profile);
-    UserSessionEntity session = sessionService.createUserSession(realm, user);
-    sessionService.attachClientSession(session, loginState.getClient());
-    String effectiveMethod = loginState.getCodeChallengeMethod() == null || loginState.getCodeChallengeMethod().isBlank()
-        ? "S256"
-        : loginState.getCodeChallengeMethod();
-    String localCode = oidcGrantService.createAuthorizationCode(
-        realm,
-        loginState.getClient(),
-        user,
-        session,
-        loginState.getRedirectUri(),
-        loginState.getScope(),
-        loginState.getCodeChallenge(),
-        effectiveMethod).code();
-    eventService.loginEvent(
-        realm,
-        user,
-        loginState.getClient(),
-        "LOGIN",
-        null,
-        "{\"grant_type\":\"authorization_code\",\"auth_source\":\"saml_broker\",\"saml_provider\":\""
-            + provider.getAlias()
-            + "\"}");
+    URI nextLocation =
+        oidcConsentService
+            .completeAuthorizationOrBeginConsent(
+                realm,
+                loginState.getClient(),
+                user,
+                loginState.getRedirectUri(),
+                loginState.getScope(),
+                loginState.getOriginalState(),
+                loginState.getCodeChallenge(),
+                loginState.getCodeChallengeMethod(),
+                null,
+                "saml_broker",
+                provider.getAlias())
+            .redirectUri();
     return new SamlBrokerCallbackResult(
-        redirectWithClientParams(loginState.getRedirectUri(), "code", localCode, "state", loginState.getOriginalState()),
+        nextLocation,
         user);
   }
 
@@ -257,16 +246,6 @@ public class SamlBrokerService {
       }
     }
     return user;
-  }
-
-  private URI redirectWithClientParams(String redirectUri, String key1, String value1, String key2, String value2) {
-    StringBuilder builder = new StringBuilder(redirectUri);
-    builder.append(redirectUri.contains("?") ? '&' : '?');
-    appendParam(builder, key1, value1);
-    if (value2 != null) {
-      appendParam(builder, key2, value2);
-    }
-    return URI.create(builder.toString());
   }
 
   private void appendParam(StringBuilder builder, String key, String value) {

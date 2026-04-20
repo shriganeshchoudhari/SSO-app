@@ -260,6 +260,105 @@ public class OidcBrokerFlowTest {
   }
 
   @Test
+  void oidc_broker_login_honors_client_consent() {
+    Response realmResp = adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.of("name", "broker-consent", "displayName", "Broker Consent"))
+        .when().post("/admin/realms")
+        .then().statusCode(anyOf(is(200), is(201)))
+        .extract().response();
+    String realmId = realmResp.jsonPath().getString("id");
+
+    adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.ofEntries(
+            new AbstractMap.SimpleEntry<>("clientId", "broker-consent-web"),
+            new AbstractMap.SimpleEntry<>("protocol", "openid-connect"),
+            new AbstractMap.SimpleEntry<>("publicClient", true),
+            new AbstractMap.SimpleEntry<>("consentRequired", true),
+            new AbstractMap.SimpleEntry<>("redirectUris", List.of("http://client.example/broker-consent/callback")),
+            new AbstractMap.SimpleEntry<>("grantTypes", List.of("authorization_code", "refresh_token"))))
+        .when().post("/admin/realms/" + realmId + "/clients")
+        .then().statusCode(anyOf(is(200), is(201)));
+
+    adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.ofEntries(
+            new AbstractMap.SimpleEntry<>("alias", "google"),
+            new AbstractMap.SimpleEntry<>("issuerUrl", "https://accounts.google.com"),
+            new AbstractMap.SimpleEntry<>("authorizationUrl", "https://accounts.google.com/o/oauth2/v2/auth"),
+            new AbstractMap.SimpleEntry<>("tokenUrl", "https://oauth2.googleapis.com/token"),
+            new AbstractMap.SimpleEntry<>("userInfoUrl", "https://openidconnect.googleapis.com/v1/userinfo"),
+            new AbstractMap.SimpleEntry<>("jwksUrl", "https://www.googleapis.com/oauth2/v3/certs"),
+            new AbstractMap.SimpleEntry<>("clientId", "google-client"),
+            new AbstractMap.SimpleEntry<>("clientSecret", "GoogleClientSecret123!"),
+            new AbstractMap.SimpleEntry<>("scopes", List.of("openid", "profile", "email")),
+            new AbstractMap.SimpleEntry<>("usernameClaim", "preferred_username"),
+            new AbstractMap.SimpleEntry<>("emailClaim", "email"),
+            new AbstractMap.SimpleEntry<>("syncAttributesOnLogin", true),
+            new AbstractMap.SimpleEntry<>("enabled", true)))
+        .when().post("/admin/realms/" + realmId + "/brokering/oidc")
+        .then().statusCode(anyOf(is(200), is(201)));
+
+    String codeVerifier = "broker-consent-verifier-123456789";
+    String codeChallenge = OidcGrantService.codeChallenge(codeVerifier);
+
+    Response brokerStart = given()
+        .redirects().follow(false)
+        .queryParam("response_type", "code")
+        .queryParam("client_id", "broker-consent-web")
+        .queryParam("redirect_uri", "http://client.example/broker-consent/callback")
+        .queryParam("scope", "openid profile email")
+        .queryParam("state", "broker-consent-state")
+        .queryParam("code_challenge", codeChallenge)
+        .queryParam("code_challenge_method", "S256")
+        .when().get("/auth/realms/broker-consent/broker/oidc/google/login")
+        .then().statusCode(anyOf(is(302), is(303)))
+        .extract().response();
+
+    String brokerState = queryValue(URI.create(brokerStart.getHeader("Location")), "state");
+    Response callbackResponse = given()
+        .redirects().follow(false)
+        .queryParam("code", "mock-google-code")
+        .queryParam("state", brokerState)
+        .when().get("/auth/realms/broker-consent/broker/oidc/google/callback")
+        .then().statusCode(anyOf(is(302), is(303)))
+        .extract().response();
+
+    String consentLocation = callbackResponse.getHeader("Location");
+    if (consentLocation == null || !consentLocation.contains("/auth/realms/broker-consent/protocol/openid-connect/auth/consent")) {
+      throw new AssertionError("broker callback should redirect to consent when the client requires it");
+    }
+    String consentState = queryValue(URI.create(consentLocation), "consent_state");
+
+    Response approved = given()
+        .redirects().follow(false)
+        .contentType("application/x-www-form-urlencoded")
+        .formParam("consent_state", consentState)
+        .formParam("decision", "approve")
+        .when().post("/auth/realms/broker-consent/protocol/openid-connect/auth/consent")
+        .then().statusCode(anyOf(is(302), is(303)))
+        .extract().response();
+
+    URI clientRedirect = URI.create(approved.getHeader("Location"));
+    String localCode = queryValue(clientRedirect, "code");
+    if (localCode == null || !"broker-consent-state".equals(queryValue(clientRedirect, "state"))) {
+      throw new AssertionError("consent approval did not complete the brokered authorization flow");
+    }
+
+    given()
+        .contentType("application/x-www-form-urlencoded")
+        .formParam("grant_type", "authorization_code")
+        .formParam("client_id", "broker-consent-web")
+        .formParam("code", localCode)
+        .formParam("redirect_uri", "http://client.example/broker-consent/callback")
+        .formParam("code_verifier", codeVerifier)
+        .when().post("/auth/realms/broker-consent/protocol/openid-connect/token")
+        .then().statusCode(200)
+        .body("access_token", notNullValue());
+  }
+
+  @Test
   void oidc_managed_user_can_be_detached_to_local_account() {
     Response realmResp = adminRequest()
         .contentType(ContentType.JSON)

@@ -30,6 +30,13 @@ type User = {
   federationSource?: string | null
 }
 type Session = { id: string; started: string; lastRefresh: string }
+type Consent = {
+  id: string
+  clientId: string
+  scopes: string[]
+  grantedAt?: string | null
+  updatedAt?: string | null
+}
 type TokenResponse = {
   access_token: string
   refresh_token?: string
@@ -50,6 +57,7 @@ export default function App() {
   const [user, setUser]               = useState<User | null>(null)
   const [email, setEmail]             = useState('')
   const [sessions, setSessions]       = useState<Session[]>([])
+  const [consents, setConsents]       = useState<Consent[]>([])
   const [newPassword, setNewPassword] = useState('')
   const [totpSecret, setTotpSecret]   = useState<string | null>(null)
   const [totpUri, setTotpUri]         = useState<string | null>(null)
@@ -85,11 +93,18 @@ export default function App() {
     setSessions(await res.json())
   }
 
+  const loadConsents = async () => {
+    if (!canUseAccount) return
+    const res = await fetch('/account/consents', { headers: authHeaders() })
+    if (!res.ok) { setConsents([]); setFeedback(null, 'Failed to load client consents.'); return }
+    setConsents(await res.json())
+  }
+
   useEffect(() => {
     if (!accessToken.trim()) {
-      setUser(null); setSessions([]); setTotpSecret(null); setTotpUri(null); return
+      setUser(null); setSessions([]); setConsents([]); setTotpSecret(null); setTotpUri(null); return
     }
-    loadUser(); loadSessions()
+    loadUser(); loadSessions(); loadConsents()
   }, [accessToken])
 
   // ── Auth actions ──────────────────────────────────────────────────────────────
@@ -108,7 +123,7 @@ export default function App() {
         { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body }
       )
       if (!res.ok) {
-        setAccessToken(''); setRefreshToken(''); setUser(null); setSessions([])
+        setAccessToken(''); setRefreshToken(''); setUser(null); setSessions([]); setConsents([])
         setFeedback(null, 'Sign-in failed. Check credentials or TOTP code.')
         return
       }
@@ -138,7 +153,7 @@ export default function App() {
   }
 
   const logoutLocal = () => {
-    setAccessToken(''); setRefreshToken(''); setUser(null); setSessions([])
+    setAccessToken(''); setRefreshToken(''); setUser(null); setSessions([]); setConsents([])
     setTotpSecret(null); setTotpUri(null); setFeedback('Signed out.', null)
   }
 
@@ -165,6 +180,13 @@ export default function App() {
       { method: 'DELETE', headers: authHeaders() })
     if (!res.ok) { setFeedback(null, 'Failed to delete session.'); return }
     await loadSessions(); setFeedback('Session deleted.', null)
+  }
+
+  const revokeConsent = async (consentId: string) => {
+    if (!window.confirm('Revoke this client consent?')) return
+    const res = await fetch(`/account/consents/${consentId}`, { method: 'DELETE', headers: authHeaders() })
+    if (!res.ok) { setFeedback(null, 'Failed to revoke consent.'); return }
+    await loadConsents(); setFeedback('Client consent revoked.', null)
   }
 
   const enrollTotp = async () => {
@@ -274,6 +296,25 @@ export default function App() {
                     <div>Started: {new Date(s.started).toLocaleString()}</div>
                     <div>Last refresh: {new Date(s.lastRefresh).toLocaleString()}</div>
                     <button onClick={() => deleteSession(s.id)} style={{ marginTop: 4 }}>Delete</button>
+                  </li>
+                ))}</ul>}
+          </section>
+
+          {/* Client consents */}
+          <section style={s.section}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <h2 style={s.h2}>Client consents</h2>
+              <button onClick={loadConsents}>Refresh</button>
+            </div>
+            {consents.length === 0
+              ? <p>No remembered client consents.</p>
+              : <ul>{consents.map(consent => (
+                  <li key={consent.id} style={{ marginBottom: 8 }}>
+                    <div><strong>{consent.clientId}</strong></div>
+                    <div>Scopes: {consent.scopes.join(', ') || 'none'}</div>
+                    <div>Granted: {consent.grantedAt ? new Date(consent.grantedAt).toLocaleString() : 'n/a'}</div>
+                    <div>Updated: {consent.updatedAt ? new Date(consent.updatedAt).toLocaleString() : 'n/a'}</div>
+                    <button onClick={() => revokeConsent(consent.id)} style={{ marginTop: 4 }}>Revoke</button>
                   </li>
                 ))}</ul>}
           </section>

@@ -25,6 +25,7 @@ type Client = {
   clientId: string
   protocol: string
   publicClient?: boolean
+  consentRequired?: boolean
   redirectUris?: string[]
   grantTypes?: string[]
 }
@@ -174,6 +175,7 @@ export default function App() {
   const [clientIdInput, setClientIdInput] = useState('')
   const [clientProtocol, setClientProtocol] = useState('openid-connect')
   const [clientPublic, setClientPublic] = useState(true)
+  const [clientConsentRequired, setClientConsentRequired] = useState(false)
   const [clientSecret, setClientSecret] = useState('')
   const [redirectUrisInput, setRedirectUrisInput] = useState('')
   const [grantTypesInput, setGrantTypesInput] = useState('authorization_code\nrefresh_token')
@@ -783,6 +785,7 @@ export default function App() {
         clientId: clientIdInput,
         protocol: clientProtocol,
         publicClient: clientPublic,
+        consentRequired: clientConsentRequired,
         secret: clientPublic ? undefined : clientSecret,
         redirectUris: parseLines(redirectUrisInput),
         grantTypes: parseLines(grantTypesInput)
@@ -798,6 +801,7 @@ export default function App() {
       }
       setClientIdInput('')
       setClientSecret('')
+      setClientConsentRequired(false)
       setRedirectUrisInput('')
       setGrantTypesInput('authorization_code\nrefresh_token')
       await loadClients(selectedRealmId)
@@ -844,6 +848,29 @@ export default function App() {
     }
     await loadClients(selectedRealmId)
     setFeedback('Client deleted.', null)
+  }
+
+  const toggleClientConsentRequired = async (client: Client) => {
+    if (!selectedRealmId) return
+    const res = await fetch(`/admin/realms/${selectedRealmId}/clients/${client.id}`, {
+      method: 'PUT',
+      headers: authHeaders(true),
+      body: JSON.stringify({
+        publicClient: client.publicClient ?? false,
+        consentRequired: !(client.consentRequired ?? false),
+        redirectUris: client.redirectUris ?? [],
+        grantTypes: client.grantTypes ?? []
+      })
+    })
+    if (!res.ok) {
+      setFeedback(null, 'Failed to update client consent setting.')
+      return
+    }
+    await loadClients(selectedRealmId)
+    setFeedback(
+      client.consentRequired ? 'Client consent requirement disabled.' : 'Client consent requirement enabled.',
+      null
+    )
   }
 
   const deleteRole = async (roleId: string) => {
@@ -1290,9 +1317,15 @@ export default function App() {
                     <div>
                       <strong>{c.clientId}</strong> - {c.protocol} {c.publicClient ? '(public)' : '(confidential)'}
                     </div>
+                    <div>Consent: {c.consentRequired ? 'required' : 'not required'}</div>
                     <div>Grant types: {(c.grantTypes ?? []).join(', ') || 'default'}</div>
                     <div>Redirect URIs: {(c.redirectUris ?? []).join(', ') || 'none'}</div>
-                    <button onClick={() => deleteClient(c.id)} style={{ marginTop: 4 }}>Delete</button>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                      <button onClick={() => toggleClientConsentRequired(c)}>
+                        {c.consentRequired ? 'Disable consent' : 'Require consent'}
+                      </button>
+                      <button onClick={() => deleteClient(c.id)}>Delete</button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -1317,6 +1350,16 @@ export default function App() {
                   <label>
                     Public Client:
                     <input type="checkbox" checked={clientPublic} onChange={e => setClientPublic(e.target.checked)} />
+                  </label>
+                </div>
+                <div>
+                  <label>
+                    Require Consent:
+                    <input
+                      type="checkbox"
+                      checked={clientConsentRequired}
+                      onChange={e => setClientConsentRequired(e.target.checked)}
+                    />
                   </label>
                 </div>
                 {!clientPublic && (

@@ -41,6 +41,7 @@ public class AdminClientsResource {
             c.getClientId(),
             c.getProtocol(),
             c.getPublicClient(),
+            c.getConsentRequired(),
             c.getRedirectUris(),
             List.copyOf(c.getGrantTypes())))
         .collect(Collectors.toList());
@@ -59,6 +60,7 @@ public class AdminClientsResource {
         c.getClientId(),
         c.getProtocol(),
         c.getPublicClient(),
+        c.getConsentRequired(),
         c.getRedirectUris(),
         List.copyOf(c.getGrantTypes()));
   }
@@ -78,6 +80,7 @@ public class AdminClientsResource {
     c.setProtocol(req.protocol);
     c.setSecret(secretProtectionService.hashClientSecret(req.secret));
     c.setPublicClient(req.publicClient != null ? req.publicClient : Boolean.FALSE);
+    c.setConsentRequired(req.consentRequired != null ? req.consentRequired : Boolean.FALSE);
     c.setRedirectUris(req.redirectUris);
     c.setGrantTypes(req.grantTypes);
     em.persist(c);
@@ -88,6 +91,7 @@ public class AdminClientsResource {
             c.getClientId(),
             c.getProtocol(),
             c.getPublicClient(),
+            c.getConsentRequired(),
             c.getRedirectUris(),
             List.copyOf(c.getGrantTypes())))
         .build();
@@ -101,6 +105,7 @@ public class AdminClientsResource {
     if (c == null || !c.getRealm().getId().equals(realmId)) throw new NotFoundException();
     if (req.secret != null) c.setSecret(secretProtectionService.hashClientSecret(req.secret));
     if (req.publicClient != null) c.setPublicClient(req.publicClient);
+    if (req.consentRequired != null) c.setConsentRequired(req.consentRequired);
     if (req.redirectUris != null) c.setRedirectUris(req.redirectUris);
     if (req.grantTypes != null) c.setGrantTypes(req.grantTypes);
     return Response.noContent().build();

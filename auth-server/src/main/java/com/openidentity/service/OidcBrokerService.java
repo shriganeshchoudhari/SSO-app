@@ -5,7 +5,6 @@ import com.openidentity.domain.ClientEntity;
 import com.openidentity.domain.OidcIdentityProviderEntity;
 import com.openidentity.domain.RealmEntity;
 import com.openidentity.domain.UserEntity;
-import com.openidentity.domain.UserSessionEntity;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -26,10 +25,8 @@ public class OidcBrokerService {
   @Inject EntityManager em;
   @Inject SecretProtectionService secretProtectionService;
   @Inject OidcBrokerConnector oidcBrokerConnector;
-  @Inject OidcGrantService oidcGrantService;
-  @Inject SessionService sessionService;
+  @Inject OidcConsentService oidcConsentService;
   @Inject FederationPolicyService federationPolicyService;
-  @Inject EventService eventService;
 
   public record BrokerCallbackResult(URI clientRedirect, UserEntity user) {}
 
@@ -91,30 +88,23 @@ public class OidcBrokerService {
         providerClientSecret);
 
     UserEntity user = findOrProvisionUser(realm, provider, profile);
-    UserSessionEntity session = sessionService.createUserSession(realm, user);
-    sessionService.attachClientSession(session, loginState.getClient());
-    String codeChallengeMethod = loginState.getCodeChallengeMethod();
-    String effectiveMethod = codeChallengeMethod == null || codeChallengeMethod.isBlank() ? "S256" : codeChallengeMethod;
-    String localCode = oidcGrantService.createAuthorizationCode(
-        realm,
-        loginState.getClient(),
-        user,
-        session,
-        loginState.getRedirectUri(),
-        loginState.getScope(),
-        loginState.getCodeChallenge(),
-        effectiveMethod).code();
-    eventService.loginEvent(
-        realm,
-        user,
-        loginState.getClient(),
-        "LOGIN",
-        null,
-        "{\"grant_type\":\"authorization_code\",\"auth_source\":\"oidc_broker\",\"oidc_provider\":\""
-            + provider.getAlias()
-            + "\"}");
+    URI nextLocation =
+        oidcConsentService
+            .completeAuthorizationOrBeginConsent(
+                realm,
+                loginState.getClient(),
+                user,
+                loginState.getRedirectUri(),
+                loginState.getScope(),
+                loginState.getOriginalState(),
+                loginState.getCodeChallenge(),
+                loginState.getCodeChallengeMethod(),
+                null,
+                "oidc_broker",
+                provider.getAlias())
+            .redirectUri();
     return new BrokerCallbackResult(
-        redirectWithClientParams(loginState.getRedirectUri(), "code", localCode, "state", loginState.getOriginalState()),
+        nextLocation,
         user);
   }
 

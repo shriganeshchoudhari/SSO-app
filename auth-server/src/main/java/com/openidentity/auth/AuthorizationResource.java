@@ -7,12 +7,10 @@ import com.openidentity.domain.OrganizationEntity;
 import com.openidentity.domain.RealmEntity;
 import com.openidentity.domain.SamlIdentityProviderEntity;
 import com.openidentity.domain.UserEntity;
-import com.openidentity.domain.UserSessionEntity;
 import com.openidentity.service.MfaTotpService;
 import com.openidentity.service.OidcClientService;
-import com.openidentity.service.OidcGrantService;
+import com.openidentity.service.OidcConsentService;
 import com.openidentity.service.SecretProtectionService;
-import com.openidentity.service.SessionService;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.ws.rs.Consumes;
@@ -41,8 +39,7 @@ public class AuthorizationResource {
 
   @Inject EntityManager em;
   @Inject OidcClientService oidcClientService;
-  @Inject OidcGrantService oidcGrantService;
-  @Inject SessionService sessionService;
+  @Inject OidcConsentService oidcConsentService;
   @Inject SecretProtectionService secretProtectionService;
   @Inject MfaTotpService mfaTotpService;
 
@@ -113,13 +110,22 @@ public class AuthorizationResource {
         scope, state, codeChallenge, codeChallengeMethod);
     try {
       UserEntity user = authenticateUser(realm, username, password, totp);
-      UserSessionEntity session = sessionService.createUserSession(realm, user);
-      sessionService.attachClientSession(session, client);
-      String method = (codeChallengeMethod == null || codeChallengeMethod.isBlank()) ? "S256" : codeChallengeMethod;
-      String code = oidcGrantService
-          .createAuthorizationCode(realm, client, user, session, redirectUri, scope, codeChallenge, method)
-          .code();
-      return Response.seeOther(redirectWithParams(redirectUri, "code", code, "state", state)).build();
+      URI nextLocation =
+          oidcConsentService
+              .completeAuthorizationOrBeginConsent(
+                  realm,
+                  client,
+                  user,
+                  redirectUri,
+                  scope,
+                  state,
+                  codeChallenge,
+                  codeChallengeMethod,
+                  branding.organizationHint(),
+                  "local",
+                  null)
+              .redirectUri();
+      return Response.seeOther(nextLocation).build();
     } catch (WebApplicationException e) {
       String errorCode = "mfa_enrollment_required".equals(e.getMessage())
           ? "mfa_enrollment_required"
@@ -135,6 +141,34 @@ public class AuthorizationResource {
           .type(MediaType.TEXT_HTML)
           .build();
     }
+  }
+
+  @GET
+  @Path("/consent")
+  @Produces(MediaType.TEXT_HTML)
+  public Response consentPage(
+      @jakarta.ws.rs.PathParam("realm") String realmName,
+      @QueryParam("consent_state") String consentState) {
+    OidcConsentService.PendingConsentView pendingConsent =
+        oidcConsentService.pendingConsent(realmName, consentState);
+    LoginBranding branding =
+        resolveBranding(pendingConsent.realm(), pendingConsent.organizationHint());
+    String html = buildConsentPage(realmName, branding, pendingConsent, consentState);
+    return Response.ok(html).type(MediaType.TEXT_HTML).build();
+  }
+
+  @POST
+  @Path("/consent")
+  @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+  public Response consentSubmit(
+      @jakarta.ws.rs.PathParam("realm") String realmName,
+      @FormParam("consent_state") String consentState,
+      @FormParam("decision") String decision) {
+    URI nextLocation =
+        "deny".equalsIgnoreCase(decision)
+            ? oidcConsentService.denyConsent(realmName, consentState)
+            : oidcConsentService.approveConsent(realmName, consentState);
+    return Response.seeOther(nextLocation).build();
   }
 
   private String buildLoginPage(
@@ -388,6 +422,203 @@ public class AuthorizationResource {
         brokerOptions,
         escapeHtml(text.clientLabel()),
         escapeHtml(clientId != null ? clientId : ""));
+  }
+
+  private String buildConsentPage(
+      String realmName,
+      LoginBranding branding,
+      OidcConsentService.PendingConsentView pendingConsent,
+      String consentState) {
+    List<String> scopes = OidcConsentService.parseScopes(pendingConsent.scope());
+    String logoText = escapeHtml(branding.logoText());
+    String pageTitle = escapeHtml(branding.pageTitle());
+    String subtitle = escapeHtml(branding.subtitle());
+    String primaryColor = cssColor(branding.primaryColor(), DEFAULT_PRIMARY);
+    String accentColor = cssColor(branding.accentColor(), DEFAULT_ACCENT);
+    String requestedScopes =
+        scopes.isEmpty()
+            ? "<li>No additional scopes requested.</li>"
+            : scopes.stream()
+                .map(scope -> "<li>" + escapeHtml(scope) + "</li>")
+                .reduce("", String::concat);
+    String formAction =
+        "/auth/realms/" + urlEncode(realmName) + "/protocol/openid-connect/auth/consent";
+
+    return """
+        <!doctype html>
+        <html lang="%s">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Authorize access · %s</title>
+          <style>
+            *, *::before, *::after { box-sizing: border-box; }
+            :root {
+              --oi-primary: %s;
+              --oi-accent: %s;
+              --oi-bg: #eef2ff;
+              --oi-card: #ffffff;
+              --oi-text: #111827;
+              --oi-muted: #6b7280;
+            }
+            body {
+              margin: 0;
+              min-height: 100vh;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              background:
+                radial-gradient(circle at top left, rgba(99, 102, 241, 0.18), transparent 32%%),
+                radial-gradient(circle at bottom right, rgba(79, 70, 229, 0.14), transparent 28%%),
+                linear-gradient(135deg, #f8fafc 0%%, var(--oi-bg) 100%%);
+              font-family: system-ui, -apple-system, sans-serif;
+              color: var(--oi-text);
+            }
+            .card {
+              background: var(--oi-card);
+              border-radius: 18px;
+              box-shadow: 0 12px 36px rgba(15, 23, 42, 0.12);
+              padding: 2.5rem 2rem;
+              width: 100%%;
+              max-width: 480px;
+              border-top: 4px solid var(--oi-primary);
+            }
+            .logo {
+              width: 56px;
+              height: 56px;
+              margin: 0 auto 1.25rem;
+              border-radius: 16px;
+              background: linear-gradient(135deg, var(--oi-primary), var(--oi-accent));
+              color: #fff;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: 700;
+              letter-spacing: .08em;
+              text-transform: uppercase;
+            }
+            h1 {
+              text-align: center;
+              font-size: 1.35rem;
+              font-weight: 700;
+              margin: 0 0 0.35rem;
+            }
+            .subtitle {
+              text-align: center;
+              font-size: .9rem;
+              color: var(--oi-muted);
+              margin: 0 0 1.5rem;
+            }
+            .meta {
+              display: grid;
+              gap: .75rem;
+              grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+              margin-bottom: 1.25rem;
+            }
+            .meta-card {
+              background: #f8fafc;
+              border: 1px solid #e5e7eb;
+              border-radius: 12px;
+              padding: .8rem .95rem;
+            }
+            .meta-card strong {
+              display: block;
+              font-size: .75rem;
+              text-transform: uppercase;
+              letter-spacing: .08em;
+              color: var(--oi-muted);
+              margin-bottom: .25rem;
+            }
+            .meta-card span {
+              display: block;
+              font-size: .95rem;
+              font-weight: 600;
+              word-break: break-word;
+            }
+            .scope-box {
+              border: 1px solid #d1d5db;
+              border-radius: 12px;
+              padding: .9rem 1rem;
+              background: #fff;
+            }
+            .scope-box h2 {
+              font-size: 1rem;
+              margin: 0 0 .65rem;
+            }
+            .scope-box ul {
+              margin: 0;
+              padding-left: 1.15rem;
+            }
+            .scope-box li {
+              margin-bottom: .35rem;
+            }
+            .actions {
+              display: flex;
+              gap: .75rem;
+              margin-top: 1.4rem;
+            }
+            .btn {
+              flex: 1;
+              padding: .8rem;
+              border-radius: 10px;
+              font-size: 1rem;
+              font-weight: 700;
+              cursor: pointer;
+              border: none;
+            }
+            .btn-primary {
+              background: linear-gradient(135deg, var(--oi-primary), var(--oi-accent));
+              color: #fff;
+            }
+            .btn-secondary {
+              background: #fff;
+              color: #374151;
+              border: 1px solid #d1d5db;
+            }
+          </style>
+        </head>
+        <body>
+        <div class="card">
+          <div class="logo">%s</div>
+          <h1>Authorize access</h1>
+          <p class="subtitle">%s</p>
+          <div class="meta">
+            <div class="meta-card">
+              <strong>Application</strong>
+              <span>%s</span>
+            </div>
+            <div class="meta-card">
+              <strong>Signed in as</strong>
+              <span>%s</span>
+            </div>
+          </div>
+          <div class="scope-box">
+            <h2>Requested scopes</h2>
+            <ul>%s</ul>
+          </div>
+          <form method="post" action="%s">
+            <input type="hidden" name="consent_state" value="%s" />
+            <div class="actions">
+              <button class="btn btn-primary" type="submit" name="decision" value="approve">Approve</button>
+              <button class="btn btn-secondary" type="submit" name="decision" value="deny">Deny</button>
+            </div>
+          </form>
+        </div>
+        </body>
+        </html>
+        """
+        .formatted(
+            escapeHtml(branding.locale()),
+            pageTitle,
+            primaryColor,
+            accentColor,
+            logoText,
+            subtitle,
+            escapeHtml(pendingConsent.client().getClientId()),
+            escapeHtml(pendingConsent.user().getUsername()),
+            requestedScopes,
+            escapeHtml(formAction),
+            escapeHtml(consentState));
   }
 
   private RealmEntity requireRealm(String realmName) {

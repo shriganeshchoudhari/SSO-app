@@ -36,6 +36,9 @@ public class ClientEntity {
   @Column(name = "public_client")
   private Boolean publicClient = Boolean.FALSE;
 
+  @Column(name = "consent_required")
+  private Boolean consentRequired = Boolean.FALSE;
+
   public UUID getId() {
     return id;
   }
@@ -95,6 +98,12 @@ public class ClientEntity {
   }
   public void setPublicClient(Boolean publicClient) {
     this.publicClient = publicClient;
+  }
+  public Boolean getConsentRequired() {
+    return consentRequired;
+  }
+  public void setConsentRequired(Boolean consentRequired) {
+    this.consentRequired = consentRequired;
   }
 
   private static List<String> splitValues(String raw) {

@@ -9,6 +9,7 @@ public class ClientDtos {
     public String protocol;
     public String secret;
     public Boolean publicClient;
+    public Boolean consentRequired;
     public List<String> redirectUris;
     public List<String> grantTypes;
   }
@@ -16,6 +17,7 @@ public class ClientDtos {
   public static class UpdateClientRequest {
     public String secret;
     public Boolean publicClient;
+    public Boolean consentRequired;
     public List<String> redirectUris;
     public List<String> grantTypes;
   }
@@ -26,6 +28,7 @@ public class ClientDtos {
     public String clientId;
     public String protocol;
     public Boolean publicClient;
+    public Boolean consentRequired;
     public List<String> redirectUris;
     public List<String> grantTypes;
 
@@ -36,6 +39,7 @@ public class ClientDtos {
         String clientId,
         String protocol,
         Boolean publicClient,
+        Boolean consentRequired,
         List<String> redirectUris,
         List<String> grantTypes) {
       this.id = id;
@@ -43,6 +47,7 @@ public class ClientDtos {
       this.clientId = clientId;
       this.protocol = protocol;
       this.publicClient = publicClient;
+      this.consentRequired = consentRequired;
       this.redirectUris = redirectUris;
       this.grantTypes = grantTypes;
     }

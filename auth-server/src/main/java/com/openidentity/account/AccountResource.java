@@ -2,12 +2,14 @@ package com.openidentity.account;
 
 import com.openidentity.api.dto.UserDtos.UserResponse;
 import com.openidentity.domain.CredentialEntity;
+import com.openidentity.domain.UserConsentEntity;
 import com.openidentity.domain.UserEntity;
 import com.openidentity.domain.UserSessionEntity;
 import com.openidentity.security.TokenValidationService;
 import com.openidentity.security.VerifiedToken;
 import com.openidentity.service.FederationPolicyService;
 import com.openidentity.service.MfaTotpService;
+import com.openidentity.service.OidcConsentService;
 import com.openidentity.service.ScimOutboundProvisioningService;
 import com.openidentity.service.SecretProtectionService;
 import io.smallrye.common.annotation.Blocking;
@@ -29,6 +31,7 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
 import org.mindrot.jbcrypt.BCrypt;
@@ -42,6 +45,7 @@ public class AccountResource {
   @Inject TokenValidationService tokenValidationService;
   @Inject FederationPolicyService federationPolicyService;
   @Inject MfaTotpService mfaTotpService;
+  @Inject OidcConsentService oidcConsentService;
   @Inject ScimOutboundProvisioningService scimOutboundProvisioningService;
   @Inject SecretProtectionService secretProtectionService;
 
@@ -69,6 +73,24 @@ public class AccountResource {
       this.id = session.getId();
       this.started = session.getStarted().toString();
       this.lastRefresh = session.getLastRefresh().toString();
+    }
+  }
+
+  public static class ConsentResponse {
+    public UUID id;
+    public String clientId;
+    public List<String> scopes;
+    public String grantedAt;
+    public String updatedAt;
+
+    public ConsentResponse() {}
+
+    public ConsentResponse(UserConsentEntity consent) {
+      this.id = consent.getId();
+      this.clientId = consent.getClient().getClientId();
+      this.scopes = parseScopes(consent.getScopesRaw());
+      this.grantedAt = consent.getCreatedAt() == null ? null : consent.getCreatedAt().toString();
+      this.updatedAt = consent.getUpdatedAt() == null ? null : consent.getUpdatedAt().toString();
     }
   }
 
@@ -163,6 +185,22 @@ public class AccountResource {
     return query.getResultList().stream().map(SessionResponse::new).toList();
   }
 
+  @GET
+  @Path("/consents")
+  public List<ConsentResponse> consents(@HeaderParam("Authorization") String authHeader) {
+    VerifiedToken token = tokenValidationService.verifyBearerHeaderWithSession(authHeader);
+    return em.createQuery(
+            "select c from UserConsentEntity c join fetch c.client "
+                + "where c.realm.id = :rid and c.user.id = :uid order by c.updatedAt desc",
+            UserConsentEntity.class)
+        .setParameter("rid", token.getRealmId())
+        .setParameter("uid", token.getUserId())
+        .getResultList()
+        .stream()
+        .map(ConsentResponse::new)
+        .toList();
+  }
+
   @DELETE
   @Path("/sessions/{sessionId}")
   @Transactional
@@ -177,11 +215,34 @@ public class AccountResource {
     return Response.noContent().build();
   }
 
+  @DELETE
+  @Path("/consents/{consentId}")
+  @Transactional
+  public Response revokeConsent(
+      @HeaderParam("Authorization") String authHeader, @PathParam("consentId") UUID consentId) {
+    VerifiedToken token = tokenValidationService.verifyBearerHeaderWithSession(authHeader);
+    oidcConsentService.revokeUserConsent(token.getRealmId(), token.getUserId(), consentId);
+    return Response.noContent().build();
+  }
+
   private UserEntity requireUser(VerifiedToken token) {
     UserEntity user = em.find(UserEntity.class, token.getUserId());
     if (user == null || !user.getRealm().getId().equals(token.getRealmId())) {
       throw new WebApplicationException("User not found", Response.Status.UNAUTHORIZED);
     }
     return user;
+  }
+
+  private static List<String> parseScopes(String scope) {
+    LinkedHashSet<String> scopes = new LinkedHashSet<>();
+    if (scope != null) {
+      for (String token : scope.trim().split("\\s+")) {
+        String normalized = token.trim();
+        if (!normalized.isBlank()) {
+          scopes.add(normalized);
+        }
+      }
+    }
+    return List.copyOf(scopes);
   }
 }
