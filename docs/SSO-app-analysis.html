@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OpenIdentity - Analysis and Progress Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#05090f;--s0:#080e1a;--s1:#0d1626;--s2:#121e33;--s3:#172440;
+  --border:#1c3255;--border2:#233d66;
+  --primary:#3b82f6;--indigo:#6366f1;--green:#10b981;--emerald:#34d399;
+  --yellow:#f59e0b;--red:#ef4444;--orange:#f97316;--cyan:#38bdf8;
+  --purple:#8b5cf6;--pink:#ec4899;--teal:#14b8a6;
+  --text:#e2e8f0;--muted:#94a3b8;--dim:#64748b;--dimmer:#475569;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;line-height:1.6}
+code{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--cyan)}
+pre{font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.8;color:var(--muted)}
+.hero{
+  position:relative;overflow:hidden;padding:60px 48px 52px;
+  background:linear-gradient(135deg,#05090f 0%,#0a1220 40%,#0f0820 70%,#05090f 100%);
+  border-bottom:1px solid var(--border);
+}
+.hero::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 60% 55% at 78% 45%,rgba(99,102,241,.12) 0%,transparent 60%),
+    radial-gradient(ellipse 40% 40% at 15% 70%,rgba(16,185,129,.07) 0%,transparent 55%),
+    radial-gradient(ellipse 35% 30% at 50% 10%,rgba(59,130,246,.06) 0%,transparent 50%);
+}
+.wrap{max-width:1480px;margin:0 auto}
+.hero-row{display:flex;align-items:center;justify-content:space-between;gap:48px;position:relative}
+.hero-left{flex:1}
+.hero-tag{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.28);
+  color:#93c5fd;padding:5px 16px;border-radius:100px;
+  font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:20px;
+}
+.tag-dot{width:6px;height:6px;border-radius:50%;background:#3b82f6;animation:blink 2.2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.hero h1{
+  font-size:50px;font-weight:900;line-height:1.04;margin-bottom:14px;
+  background:linear-gradient(125deg,#f1f5f9 0%,#93c5fd 45%,#a5b4fc 75%,#c4b5fd 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.hero-sub{font-size:15px;color:var(--muted);max-width:700px;line-height:1.8;margin-bottom:24px}
+.hero-meta{display:flex;flex-wrap:wrap;gap:18px}
+.hm{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--dim);font-weight:500}
+.hm-i{color:var(--cyan);font-size:15px}
+.hero-right{display:flex;flex-direction:column;align-items:center;gap:20px;flex-shrink:0}
+.scores-row{display:flex;gap:20px;align-items:center}
+.score-ring{position:relative;width:160px;height:160px;flex-shrink:0}
+.score-ring svg{transform:rotate(-90deg)}
+.score-inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.score-num{font-size:38px;font-weight:900;line-height:1}
+.score-lbl{font-size:10px;color:var(--dim);font-weight:600;letter-spacing:.09em;text-transform:uppercase;margin-top:2px}
+.mini-scores{display:flex;flex-direction:column;gap:8px}
+.mini-s{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted)}
+.mini-pct{font-weight:700;width:42px;text-align:right;font-size:12px}
+.mini-bar{width:96px;height:5px;background:var(--s2);border-radius:100px;overflow:hidden}
+.mini-fill{height:100%;border-radius:100px}
+.score-caption{text-align:center;font-size:12px;color:var(--muted);line-height:1.5}
+.nav{background:rgba(8,14,26,.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.nav-inner{max-width:1480px;margin:0 auto;padding:0 48px;display:flex;overflow-x:auto;gap:2px}
+.tab{padding:13px 18px;font-size:12px;font-weight:600;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;transition:color .2s,border-color .2s;white-space:nowrap;user-select:none}
+.tab:hover{color:var(--muted)}
+.tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+.page{max-width:1480px;margin:0 auto;padding:40px 48px}
+.section{display:none}
+.section.active{display:block}
+.sh{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:20px;display:flex;align-items:center;gap:12px}
+.sh::after{content:'';flex:1;height:1px;background:var(--border)}
+.sh-tag{font-size:10px;color:var(--dimmer);font-weight:500;letter-spacing:normal;text-transform:none;background:var(--s1);border:1px solid var(--border);padding:2px 8px;border-radius:4px}
+.stat-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:12px;margin-bottom:32px}
+.stat{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:18px;position:relative;overflow:hidden;transition:border-color .2s,transform .2s}
+.stat:hover{transform:translateY(-2px);border-color:var(--border2)}
+.stat::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:14px 14px 0 0}
+.s-blue::before{background:linear-gradient(90deg,#3b82f6,#6366f1)}
+.s-green::before{background:linear-gradient(90deg,#10b981,#34d399)}
+.s-cyan::before{background:linear-gradient(90deg,#06b6d4,#38bdf8)}
+.s-amber::before{background:linear-gradient(90deg,#f59e0b,#f97316)}
+.s-purple::before{background:linear-gradient(90deg,#8b5cf6,#6366f1)}
+.s-teal::before{background:linear-gradient(90deg,#14b8a6,#10b981)}
+.s-pink::before{background:linear-gradient(90deg,#ec4899,#8b5cf6)}
+.stat-ico{font-size:18px;margin-bottom:10px}
+.stat-val{font-size:26px;font-weight:900;line-height:1;margin-bottom:4px}
+.s-blue .stat-val{color:#93c5fd}.s-green .stat-val{color:#6ee7b7}
+.s-cyan .stat-val{color:#7dd3fc}.s-amber .stat-val{color:#fcd34d}
+.s-purple .stat-val{color:#c4b5fd}.s-teal .stat-val{color:#5eead4}
+.s-pink .stat-val{color:#f9a8d4}
+.stat-lbl{font-size:10px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.07em}
+.phase-bar{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin-bottom:32px}
+.pbar{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:12px 14px;text-align:center;transition:all .2s}
+.pbar:hover{border-color:var(--border2)}
+.pbar-name{font-size:10px;font-weight:600;color:var(--dim);margin-bottom:6px}
+.pbar-val{font-size:18px;font-weight:800;line-height:1;margin-bottom:4px}
+.pbar-sub{font-size:10px;color:var(--dim)}
+.p-done .pbar-val{color:var(--emerald)}.p-done{border-top:2px solid var(--green)}
+.p-high .pbar-val{color:#fb923c}.p-high{border-top:2px solid var(--orange)}
+.p-med .pbar-val{color:#fbbf24}.p-med{border-top:2px solid var(--yellow)}
+.p-low .pbar-val{color:#93c5fd}.p-low{border-top:2px solid var(--primary)}
+.p-zero .pbar-val{color:var(--dim)}
+.prog-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px}
+.prog-card{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:22px 26px}
+.prog-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:18px;display:flex;align-items:center;gap:8px}
+.prog-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.prog-row:last-child{margin-bottom:0}
+.prog-lbl{font-size:11px;font-weight:500;color:var(--muted);width:210px;flex-shrink:0;line-height:1.3}
+.prog-bg{flex:1;background:var(--s2);border-radius:100px;height:7px;overflow:hidden}
+.prog-fill{height:100%;border-radius:100px;transition:width 1.8s cubic-bezier(.22,1,.36,1)}
+.pc{font-size:11px;font-weight:700;width:38px;text-align:right;flex-shrink:0}
+.svc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:32px}
+.svc{background:var(--s1);border:1px solid var(--border);border-radius:13px;padding:18px;transition:all .2s}
+.svc:hover{border-color:var(--border2);transform:translateY(-2px)}
+.svc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.svc-name{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--text)}
+.svc-port{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--cyan);background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.2);border-radius:5px;padding:2px 7px}
+.svc-ok{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--green);font-weight:700;margin-bottom:6px}
+.sdot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 5px currentColor}
+.svc-desc{font-size:11px;color:var(--dim);line-height:1.55}
+.svc-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.svtag{font-size:10px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.18);color:#a5b4fc;padding:1px 7px;border-radius:4px}
+.roadmap{display:flex;flex-direction:column;gap:14px;margin-bottom:32px}
+.ph{background:var(--s1);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.ph-hdr{padding:14px 20px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+.ph-hdr.done{background:linear-gradient(135deg,rgba(16,185,129,.1),rgba(5,150,105,.03))}
+.ph-hdr.act{background:linear-gradient(135deg,rgba(239,68,68,.1),rgba(220,38,38,.03))}
+.ph-hdr.next{background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(217,119,6,.03))}
+.ph-hdr.plan{background:linear-gradient(135deg,rgba(59,130,246,.08),rgba(37,99,235,.02))}
+.ph-left{display:flex;align-items:center;gap:12px}
+.ph-num{font-size:11px;font-weight:700;color:var(--dim);font-family:'JetBrains Mono',monospace;width:46px}
+.ph-title{font-size:13px;font-weight:700;color:var(--text)}
+.ph-sub{font-size:11px;color:var(--dim)}
+.ph-right{display:flex;align-items:center;gap:12px}
+.ph-pct{font-size:13px;font-weight:800}
+.done .ph-pct{color:var(--green)}
+.act .ph-pct{color:var(--orange)}
+.next .ph-pct{color:var(--yellow)}
+.plan .ph-pct{color:#93c5fd}
+.ph-body{padding:16px 20px 18px;border-top:1px solid var(--border);display:none}
+.ph-body.open{display:block}
+.ph-tasks{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.ptask{display:flex;align-items:flex-start;gap:8px;font-size:11px;color:var(--muted);line-height:1.4}
+.ptask.ok{color:var(--emerald)}
+.ptask.hot{color:#fb923c}
+.ptask.warn{color:#fbbf24}
+.ptask.ext{color:#a5b4fc}
+.chk{width:14px;height:14px;border-radius:50%;border:1.5px solid currentColor;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:900}
+.ptask.ok .chk{background:var(--emerald);border-color:var(--emerald);color:#fff}
+.itbl-wrap{background:var(--s1);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:32px}
+.itbl{width:100%;border-collapse:collapse}
+.itbl th{padding:10px 16px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);background:var(--s2);border-bottom:1px solid var(--border)}
+.itbl td{padding:10px 16px;border-bottom:1px solid rgba(28,50,85,.4);font-size:12px;vertical-align:middle}
+.itbl tr:last-child td{border-bottom:none}
+.itbl tr:hover td{background:rgba(99,102,241,.03)}
+.ipri{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:100px}
+.p0{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.25)}
+.p1{background:rgba(249,115,22,.1);color:#fb923c;border:1px solid rgba(249,115,22,.2)}
+.p2{background:rgba(245,158,11,.08);color:#fbbf24;border:1px solid rgba(245,158,11,.18)}
+.guide-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px}
+.gcard{background:var(--s1);border:1px solid var(--border);border-radius:13px;overflow:hidden;transition:border-color .2s}
+.gcard:hover{border-color:var(--border2)}
+.gcard-hdr{padding:13px 18px;background:var(--s2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.gcard-ico{font-size:16px}
+.gcard-title{font-size:13px;font-weight:700;color:var(--text)}
+.gcard-priority{font-size:10px;font-weight:700;padding:2px 7px;border-radius:100px;margin-left:auto}
+.gp0{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.25)}
+.gp1{background:rgba(245,158,11,.1);color:#fbbf24;border:1px solid rgba(245,158,11,.2)}
+.gp2{background:rgba(59,130,246,.1);color:#93c5fd;border:1px solid rgba(59,130,246,.2)}
+.gcard-body{padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.gstep{display:flex;gap:10px;font-size:12px;color:var(--muted);line-height:1.4}
+.gstep-num{width:20px;height:20px;border-radius:50%;background:var(--s3);font-size:11px;font-weight:700;color:var(--dim);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.gtip{background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);border-radius:8px;padding:10px 12px;font-size:11px;color:#93c5fd;line-height:1.5}
+.doc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:32px}
+.doc{background:var(--s1);border:1px solid var(--border);border-radius:11px;padding:14px;transition:border-color .2s}
+.doc:hover{border-color:var(--border2)}
+.doc-file{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--cyan);margin-bottom:4px;font-weight:600}
+.doc-name{font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px}
+.doc-meta{font-size:10px;color:var(--dim)}
+.doc-badge{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:100px;margin-top:5px}
+.db-ok{background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.25)}
+.db-warn{background:rgba(245,158,11,.1);color:#fbbf24;border:1px solid rgba(245,158,11,.22)}
+.db-dr{background:rgba(59,130,246,.1);color:#93c5fd;border:1px solid rgba(59,130,246,.22)}
+.db-miss{background:rgba(239,68,68,.1);color:#f87171;border:1px solid rgba(239,68,68,.22)}
+.arch{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:28px;margin-bottom:32px;overflow-x:auto}
+.alert{border-radius:12px;padding:16px 20px;margin-bottom:24px;border-left:3px solid}
+.alert-green{background:rgba(16,185,129,.07);border-color:var(--green)}
+.alert-orange{background:rgba(249,115,22,.07);border-color:var(--orange)}
+.alert-red{background:rgba(239,68,68,.07);border-color:var(--red)}
+.alert-blue{background:rgba(59,130,246,.07);border-color:var(--primary)}
+.alert h4{font-size:13px;font-weight:700;margin-bottom:6px}
+.alert-green h4{color:var(--emerald)}.alert-orange h4{color:#fb923c}
+.alert-red h4{color:#f87171}.alert-blue h4{color:#93c5fd}
+.alert p{font-size:12px;color:var(--muted);line-height:1.55}
+footer{border-top:1px solid var(--border);padding:18px 48px}
+.foot{max-width:1480px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;gap:20px}
+.foot-l{font-size:11px;color:var(--dim)}
+.foot-tags{display:flex;flex-wrap:wrap;gap:6px}
+.ftag{font-size:10px;color:var(--dim);background:var(--s1);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-family:'JetBrains Mono',monospace}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.fade{animation:fadeUp .4s ease both}
+.d1{animation-delay:.07s}.d2{animation-delay:.14s}.d3{animation-delay:.21s}
+@media(max-width:1200px){.stat-grid{grid-template-columns:repeat(4,1fr)}.svc-grid{grid-template-columns:repeat(2,1fr)}.phase-bar{grid-template-columns:repeat(4,1fr)}.doc-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:768px){.stat-grid{grid-template-columns:repeat(2,1fr)}.prog-grid{grid-template-columns:1fr}.guide-grid{grid-template-columns:1fr}.hero h1{font-size:32px}.hero-row{flex-direction:column}.page{padding:24px 20px}.svc-grid,.doc-grid{grid-template-columns:1fr}.phase-bar{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-row">
+      <div class="hero-left">
+        <div class="hero-tag"><span class="tag-dot"></span>Source-verified dashboard - 2026-04-12 - repo and docs audit</div>
+        <h1>OpenIdentity<br>Progress Dashboard</h1>
+        <p class="hero-sub">Repository-wide analysis built from the live source tree, current markdown docs, backend and frontend verification runs, and the current task board. The platform is broad and materially implemented, but the branch is not fully green today because readiness drops to DOWN when optional Redis is absent.</p>
+        <div class="hero-meta">
+          <span class="hm"><span class="hm-i">TIME</span>April 12, 2026 - Asia/Calcutta</span>
+          <span class="hm"><span class="hm-i">STACK</span>Quarkus 3.8 - Java 21 - React 18 - Vite</span>
+          <span class="hm"><span class="hm-i">OIDC</span>RS256 - JWKS - PKCE - refresh tokens</span>
+          <span class="hm"><span class="hm-i">SCOPE</span>LDAP - OIDC broker - SAML - SCIM - orgs</span>
+          <span class="hm"><span class="hm-i">STATUS</span>Phases 1-3 complete - Phases 4-5 in progress</span>
+          <span class="hm"><span class="hm-i">BLOCKER</span>Backend readiness fails when Redis is missing</span>
+        </div>
+      </div>
+      <div class="hero-right">
+        <div class="scores-row">
+          <div class="score-ring">
+            <svg width="160" height="160" viewBox="0 0 160 160">
+              <circle cx="80" cy="80" r="68" fill="none" stroke="#1c3255" stroke-width="10"/>
+              <circle cx="80" cy="80" r="68" fill="none" stroke="url(#rg)" stroke-width="10" stroke-linecap="round" stroke-dasharray="427.3" stroke-dashoffset="59.8" id="scoreArc"/>
+              <defs>
+                <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#10b981"/>
+                  <stop offset="40%" stop-color="#3b82f6"/>
+                  <stop offset="100%" stop-color="#6366f1"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="score-inner">
+              <span class="score-num" style="background:linear-gradient(135deg,#10b981,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">86%</span>
+              <span class="score-lbl">Overall</span>
+            </div>
+          </div>
+          <div class="mini-scores">
+            <div class="mini-s"><span style="color:var(--emerald)">Implementation</span><div class="mini-bar"><div class="mini-fill" style="width:92%;background:var(--green)"></div></div><span class="mini-pct" style="color:var(--emerald)">92%</span></div>
+            <div class="mini-s"><span style="color:#93c5fd">Backend verification</span><div class="mini-bar"><div class="mini-fill" style="width:68%;background:var(--primary)"></div></div><span class="mini-pct" style="color:#93c5fd">68%</span></div>
+            <div class="mini-s"><span style="color:#fcd34d">Docs alignment</span><div class="mini-bar"><div class="mini-fill" style="width:74%;background:var(--yellow)"></div></div><span class="mini-pct" style="color:#fcd34d">74%</span></div>
+            <div class="mini-s"><span style="color:#c4b5fd">Operations</span><div class="mini-bar"><div class="mini-fill" style="width:72%;background:var(--purple)"></div></div><span class="mini-pct" style="color:#c4b5fd">72%</span></div>
+            <div class="mini-s"><span style="color:#fb923c">HA readiness</span><div class="mini-bar"><div class="mini-fill" style="width:58%;background:var(--orange)"></div></div><span class="mini-pct" style="color:#fb923c">58%</span></div>
+            <div class="mini-s"><span style="color:#f87171">Release green</span><div class="mini-bar"><div class="mini-fill" style="width:40%;background:var(--red)"></div></div><span class="mini-pct" style="color:#f87171">40%</span></div>
+          </div>
+        </div>
+        <div class="score-caption">High feature coverage, but not fully releasable today.<br><span style="color:#f87171;font-size:10px">Backend suite fails because optional Redis currently makes readiness return 503.</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="tab active" onclick="showTab('overview',this)">Overview</div>
+    <div class="tab" onclick="showTab('progress',this)">Phase Progress</div>
+    <div class="tab" onclick="showTab('services',this)">Runtime Shape</div>
+    <div class="tab" onclick="showTab('verification',this)">Verification</div>
+    <div class="tab" onclick="showTab('docs',this)">Docs Alignment</div>
+    <div class="tab" onclick="showTab('issues',this)">Open Issues</div>
+    <div class="tab" onclick="showTab('guide',this)">Next Steps</div>
+  </div>
+</nav>
+<div class="page">
+<div class="section active" id="tab-overview">
+  <div class="alert alert-red fade">
+    <h4>Current blocker</h4>
+    <p>The repository is not fully green on April 12, 2026. <strong>Backend verification fails</strong> because <code>/q/health/ready</code> returns <code>503</code> when the Redis health check is down, even though Redis is configured as optional for rate limiting. This currently breaks <code>ObservabilityTest</code> and <code>SigningKeyRotationTest</code>.</p>
+  </div>
+  <p class="sh">Platform Snapshot <span class="sh-tag">Source-based read of code, docs, and local verification</span></p>
+  <div class="stat-grid fade">
+    <div class="stat s-blue"><div class="stat-ico">001</div><div class="stat-val">117</div><div class="stat-lbl">Backend source files</div></div>
+    <div class="stat s-green"><div class="stat-ico">002</div><div class="stat-val">24</div><div class="stat-lbl">Backend test files</div></div>
+    <div class="stat s-teal"><div class="stat-ico">003</div><div class="stat-val">130</div><div class="stat-lbl">Liquibase SQL files</div></div>
+    <div class="stat s-purple"><div class="stat-ico">004</div><div class="stat-val">27</div><div class="stat-lbl">Deploy assets</div></div>
+    <div class="stat s-cyan"><div class="stat-ico">005</div><div class="stat-val">13</div><div class="stat-lbl">Markdown docs</div></div>
+    <div class="stat s-amber"><div class="stat-ico">006</div><div class="stat-val">2</div><div class="stat-lbl">Frontend builds passing</div></div>
+    <div class="stat s-pink"><div class="stat-ico">007</div><div class="stat-val">2</div><div class="stat-lbl">Backend tests failing</div></div>
+  </div>
+  <p class="sh">Completion Scorecard <span class="sh-tag">Derived from task board plus live verification</span></p>
+  <div class="phase-bar fade d1">
+    <div class="pbar p-done"><div class="pbar-name">Phase 1</div><div class="pbar-val">100%</div><div class="pbar-sub">Security baseline complete</div></div>
+    <div class="pbar p-done"><div class="pbar-name">Phase 2</div><div class="pbar-val">100%</div><div class="pbar-sub">OIDC core complete</div></div>
+    <div class="pbar p-done"><div class="pbar-name">Phase 3</div><div class="pbar-val">100%</div><div class="pbar-sub">Product surfaces complete</div></div>
+    <div class="pbar p-high"><div class="pbar-name">Phase 4</div><div class="pbar-val">72%</div><div class="pbar-sub">Federation broad but incomplete</div></div>
+    <div class="pbar p-med"><div class="pbar-name">Phase 5</div><div class="pbar-val">64%</div><div class="pbar-sub">Ops assets exist, HA incomplete</div></div>
+    <div class="pbar p-high"><div class="pbar-name">Frontend</div><div class="pbar-val">100%</div><div class="pbar-sub">Both builds passing</div></div>
+    <div class="pbar p-med"><div class="pbar-name">Docs</div><div class="pbar-val">74%</div><div class="pbar-sub">Mostly aligned, some drift</div></div>
+    <div class="pbar p-low"><div class="pbar-name">Release</div><div class="pbar-val">40%</div><div class="pbar-sub">Blocked by backend readiness</div></div>
+  </div>
+  <p class="sh">Architecture Overview</p>
+  <div class="arch fade d2">
+<pre>
+<span style="color:#38bdf8;font-weight:700">OPENIDENTITY - VERIFIED REPOSITORY SHAPE</span>
+<span style="color:#64748b">==========================================================================</span>
+
+<span style="color:#38bdf8">+---------------------------------------------------------------------------+</span>
+<span style="color:#38bdf8">| admin-ui                                                                  |</span>
+<span style="color:#38bdf8">| React 18 + Vite + PatternFly operational console                          |</span>
+<span style="color:#38bdf8">| Current admin surface lives mainly in src/App.tsx                         |</span>
+<span style="color:#38bdf8">+--------------------------------------+------------------------------------+</span>
+                                       <span style="color:#64748b">| HTTP / REST</span>
+<span style="color:#10b981">+--------------------------------------+------------------------------------+</span>
+<span style="color:#10b981">| auth-server                                                               |</span>
+<span style="color:#10b981">| Quarkus 3.8 + Java 21 backend                                             |</span>
+<span style="color:#10b981">| Admin APIs, account APIs, OIDC, JWKS, LDAP, OIDC broker, SAML, SCIM       |</span>
+<span style="color:#10b981">| Health, metrics, tracing, scheduled jobs, Liquibase, Hibernate ORM        |</span>
+<span style="color:#10b981">+-------------------------+--------------------------+-------------------------+</span>
+                          <span style="color:#64748b">|                          |</span>
+              <span style="color:#93c5fd">+-----------v---------+</span>  <span style="color:#c4b5fd">+--------v---------+</span>
+              <span style="color:#93c5fd">| account-ui          |</span>  <span style="color:#c4b5fd">| deploy assets      |</span>
+              <span style="color:#93c5fd">| React 18 self-serve |</span>  <span style="color:#c4b5fd">| Docker, K8s, Helm, |</span>
+              <span style="color:#93c5fd">| profile/password/   |</span>  <span style="color:#c4b5fd">| Grafana, OTel      |</span>
+              <span style="color:#93c5fd">| TOTP/sessions       |</span>  <span style="color:#c4b5fd">| collector config   |</span>
+              <span style="color:#93c5fd">+---------------------+</span>  <span style="color:#c4b5fd">+-------------------+</span>
+
+<span style="color:#f59e0b">Supplementary runtime</span>: <span style="color:#e2e8f0">index.js</span> is only a minimal Express health endpoint and is not
+part of the main identity platform path.
+</pre>
+  </div>
+  <div class="alert alert-blue fade d3">
+    <h4>High-confidence finding</h4>
+    <p>The codebase is far beyond a simple auth MVP. Source inspection confirms full local IAM, OIDC browser flows, persisted signing keys, hosted login, LDAP federation, OIDC and SAML broker flows, organizations, SCIM inbound and outbound groundwork, and real deployment artifacts.</p>
+  </div>
+</div>
+<div class="section" id="tab-progress">
+  <div class="alert alert-green fade">
+    <h4>Current phase read</h4>
+    <p>Phases 1 through 3 are complete in the repository. Phase 4 is substantial and Phase 5 has real deployment and observability assets, but both still contain unresolved completion gaps.</p>
+  </div>
+  <p class="sh">Phased Roadmap Status</p>
+  <div class="roadmap fade">
+    <div class="ph">
+      <div class="ph-hdr done" onclick="togglePhase(this)">
+        <div class="ph-left"><span class="ph-num">Phase 1</span><div><div class="ph-title">MVP Hardening and Security Baseline</div><div class="ph-sub">Admin auth, token trust, secret protection, account/admin boundary</div></div></div>
+        <div class="ph-right"><span class="ph-pct">100%</span></div>
+      </div>
+      <div class="ph-body">
+        <div class="ph-tasks">
+          <div class="ptask ok"><div class="chk">x</div>Admin APIs protected with bootstrap token or verified admin JWT</div>
+          <div class="ptask ok"><div class="chk">x</div>Userinfo and introspection use real token verification</div>
+          <div class="ptask ok"><div class="chk">x</div>Client secrets are hashed before persistence</div>
+          <div class="ptask ok"><div class="chk">x</div>TOTP secrets are protected at rest</div>
+          <div class="ptask ok"><div class="chk">x</div>Account UI now uses dedicated self-service endpoints</div>
+          <div class="ptask warn"><div class="chk">!</div>Tracked generated artifacts still dirty the repo after verification runs</div>
+        </div>
+      </div>
+    </div>
+    <div class="ph">
+      <div class="ph-hdr done" onclick="togglePhase(this)">
+        <div class="ph-left"><span class="ph-num">Phase 2</span><div><div class="ph-title">OIDC Core Compliance</div><div class="ph-sub">Authorize, PKCE, refresh, revoke, discovery, signing keys, JWKS</div></div></div>
+        <div class="ph-right"><span class="ph-pct">100%</span></div>
+      </div>
+      <div class="ph-body">
+        <div class="ph-tasks">
+          <div class="ptask ok"><div class="chk">x</div>Authorization code flow with PKCE is implemented</div>
+          <div class="ptask ok"><div class="chk">x</div>Refresh token issuance and revocation are implemented</div>
+          <div class="ptask ok"><div class="chk">x</div>Redirect URI and client grant-type controls exist</div>
+          <div class="ptask ok"><div class="chk">x</div>RS256 key persistence, JWKS, and admin-triggered rotation exist</div>
+          <div class="ptask ok"><div class="chk">x</div>Discovery document exposes the implemented OIDC metadata</div>
+          <div class="ptask ok"><div class="chk">x</div>Key rotation tests and OIDC flow tests exist in the suite</div>
+        </div>
+      </div>
+    </div>
+    <div class="ph">
+      <div class="ph-hdr done" onclick="togglePhase(this)">
+        <div class="ph-left"><span class="ph-num">Phase 3</span><div><div class="ph-title">Productized Admin and Account Experience</div><div class="ph-sub">Hosted login, account portal, admin workflows, audit visibility</div></div></div>
+        <div class="ph-right"><span class="ph-pct">100%</span></div>
+      </div>
+      <div class="ph-body">
+        <div class="ph-tasks">
+          <div class="ptask ok"><div class="chk">x</div>Hosted login page is branded and browser-flow aware</div>
+          <div class="ptask ok"><div class="chk">x</div>Account portal supports sign-in, refresh, profile, password, TOTP, sessions</div>
+          <div class="ptask ok"><div class="chk">x</div>Admin UI supports core CRUD and signing-key workflows</div>
+          <div class="ptask ok"><div class="chk">x</div>Admin UI surfaces recent login and admin audit events</div>
+          <div class="ptask ok"><div class="chk">x</div>Organization management and delegated org-admin support are present</div>
+          <div class="ptask ok"><div class="chk">x</div>Frontend production builds pass on both apps</div>
+        </div>
+      </div>
+    </div>
+    <div class="ph">
+      <div class="ph-hdr next" onclick="togglePhase(this)">
+        <div class="ph-left"><span class="ph-num">Phase 4</span><div><div class="ph-title">Federation and Enterprise Identity</div><div class="ph-sub">LDAP, OIDC broker, SAML, organizations, SCIM</div></div></div>
+        <div class="ph-right"><span class="ph-pct">72%</span></div>
+      </div>
+      <div class="ph-body">
+        <div class="ph-tasks">
+          <div class="ptask ok"><div class="chk">x</div>LDAP provider config, login fallback, managed-user policy, and reconciliation exist</div>
+          <div class="ptask ok"><div class="chk">x</div>OIDC broker config and login/callback flow exist</div>
+          <div class="ptask ok"><div class="chk">x</div>SAML metadata, AuthnRequest, ACS validation, signature validation, and SLO groundwork exist</div>
+          <div class="ptask ok"><div class="chk">x</div>Organizations support members, branding, and delegated org-admin paths</div>
+          <div class="ptask ok"><div class="chk">x</div>SCIM supports Users, Groups, PATCH, filter, Bulk, mappings, and outbound target config</div>
+          <div class="ptask hot"><div class="chk">!</div>LDAP lifecycle reconciliation still needs broader completion</div>
+          <div class="ptask hot"><div class="chk">!</div>OIDC and SAML broker lifecycle controls remain broader than current baseline</div>
+          <div class="ptask hot"><div class="chk">!</div>SCIM outbound lifecycle is substantial but still not complete end-to-end</div>
+          <div class="ptask warn"><div class="chk">!</div>Richer tenant policy, ABAC, consent, and developer extensibility are still missing</div>
+        </div>
+      </div>
+    </div>
+    <div class="ph">
+      <div class="ph-hdr act" onclick="togglePhase(this)">
+        <div class="ph-left"><span class="ph-num">Phase 5</span><div><div class="ph-title">Operations, HA, and Production Readiness</div><div class="ph-sub">Deploy artifacts, observability, shared state, runbooks, CI gates</div></div></div>
+        <div class="ph-right"><span class="ph-pct">64%</span></div>
+      </div>
+      <div class="ph-body">
+        <div class="ph-tasks">
+          <div class="ptask ok"><div class="chk">x</div>Dockerfile, Compose, Kubernetes manifests, Helm chart, Grafana, and OTel config exist</div>
+          <div class="ptask ok"><div class="chk">x</div>Health, metrics, tracing, and backup/restore runbook are present</div>
+          <div class="ptask ok"><div class="chk">x</div>Release gates include OWASP dep-check, Trivy, and smoke-test jobs</div>
+          <div class="ptask ok"><div class="chk">x</div>Rate limiting has optional Redis-backed shared counters</div>
+          <div class="ptask ok"><div class="chk">x</div>DB-backed sessions now refresh on verified bearer traffic</div>
+          <div class="ptask hot"><div class="chk">!</div>Readiness currently fails when Redis is absent even though Redis is optional</div>
+          <div class="ptask hot"><div class="chk">!</div>Full shared HA session externalization is still incomplete</div>
+          <div class="ptask warn"><div class="chk">!</div>Tracked surefire outputs still dirty the repo after test runs</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="section" id="tab-services">
+  <p class="sh">Runtime Shape and Major Capability Areas</p>
+  <div class="svc-grid fade">
+    <div class="svc"><div class="svc-top"><div class="svc-name">auth-server</div><div class="svc-port">:7070</div></div><div class="svc-ok"><span class="sdot"></span>Substantial backend runtime</div><div class="svc-desc">Primary Quarkus service with admin APIs, account APIs, OIDC, JWT key management, hosted login, federation, SCIM, observability, and scheduled jobs.</div><div class="svc-tags"><span class="svtag">Quarkus</span><span class="svtag">OIDC</span><span class="svtag">SCIM</span><span class="svtag">SAML</span></div></div>
+    <div class="svc"><div class="svc-top"><div class="svc-name">admin-ui</div><div class="svc-port">build ok</div></div><div class="svc-ok"><span class="sdot"></span>Operational admin console</div><div class="svc-desc">React 18 + Vite + PatternFly console that currently centralizes CRUD, signing keys, organizations, federation provider config, and audit views.</div><div class="svc-tags"><span class="svtag">React 18</span><span class="svtag">PatternFly</span><span class="svtag">Admin</span></div></div>
+    <div class="svc"><div class="svc-top"><div class="svc-name">account-ui</div><div class="svc-port">build ok</div></div><div class="svc-ok"><span class="sdot"></span>Authenticated account portal</div><div class="svc-desc">Self-service React app for sign-in, profile, password, TOTP, and session management through dedicated account APIs.</div><div class="svc-tags"><span class="svtag">React 18</span><span class="svtag">Self-service</span><span class="svtag">Bearer auth</span></div></div>
+    <div class="svc"><div class="svc-top"><div class="svc-name">deploy</div><div class="svc-port">27 files</div></div><div class="svc-ok"><span class="sdot"></span>Real deployment assets</div><div class="svc-desc">Helm chart, Kubernetes manifests, Grafana dashboard, and OpenTelemetry collector config are present in the repository.</div><div class="svc-tags"><span class="svtag">K8s</span><span class="svtag">Helm</span><span class="svtag">Grafana</span></div></div>
+    <div class="svc"><div class="svc-top"><div class="svc-name">LDAP federation</div><div class="svc-port">phase 4</div></div><div class="svc-ok"><span class="sdot"></span>Baseline implemented</div><div class="svc-desc">Provider config, login fallback, managed-user policy, sync-on-login options, disable-missing behavior, and reconciliation jobs exist.</div><div class="svc-tags"><span class="svtag">LDAP</span><span class="svtag">Reconcile</span><span class="svtag">Managed users</span></div></div>
+    <div class="svc"><div class="svc-top"><div class="svc-name">OIDC / SAML brokering</div><div class="svc-port">phase 4</div></div><div class="svc-ok"><span class="sdot"></span>Substantial baseline</div><div class="svc-desc">OIDC broker login flow and SAML broker metadata, signed AuthnRequest, ACS validation, signature verification, and logout groundwork exist.</div><div class="svc-tags"><span class="svtag">OIDC broker</span><span class="svtag">SAML</span><span class="svtag">SLO</span></div></div>
+    <div class="svc"><div class="svc-top"><div class="svc-name">Organizations</div><div class="svc-port">phase 4</div></div><div class="svc-ok"><span class="sdot"></span>Groundwork implemented</div><div class="svc-desc">Organization and member entities, admin CRUD, delegated org-admin filtering, branding overrides, and locale-aware hosted login theming exist.</div><div class="svc-tags"><span class="svtag">Org admin</span><span class="svtag">Branding</span><span class="svtag">Locale</span></div></div>
+    <div class="svc"><div class="svc-top"><div class="svc-name">SCIM provisioning</div><div class="svc-port">phase 4</div></div><div class="svc-ok"><span class="sdot"></span>Broad baseline</div><div class="svc-desc">SCIM Users, Groups, PATCH, filter, Bulk, settings, mappings, outbound targets, outbound group sync, and scheduled reconciliation are implemented.</div><div class="svc-tags"><span class="svtag">Users</span><span class="svtag">Groups</span><span class="svtag">Bulk</span><span class="svtag">Outbound</span></div></div>
+  </div>
+  <p class="sh">Key Source Areas</p>
+  <div class="doc-grid fade d1">
+    <div class="doc"><div class="doc-file">auth-server/src/main/java/com/openidentity/auth</div><div class="doc-name">Protocol surface</div><div class="doc-meta">Authorize, token, revoke, discovery, broker, SAML, logout, introspection, userinfo</div><span class="doc-badge db-ok">Implemented</span></div>
+    <div class="doc"><div class="doc-file">auth-server/src/main/java/com/openidentity/api</div><div class="doc-name">Admin and SCIM APIs</div><div class="doc-meta">Admin resources for realms, users, clients, orgs, federation, SCIM settings, keys</div><span class="doc-badge db-ok">Implemented</span></div>
+    <div class="doc"><div class="doc-file">auth-server/src/main/java/com/openidentity/service</div><div class="doc-name">Core services</div><div class="doc-meta">Keys, federation, SCIM, sessions, tracing, observability, secrets, lifecycle</div><span class="doc-badge db-ok">Implemented</span></div>
+    <div class="doc"><div class="doc-file">auth-server/src/main/resources/db/changelog</div><div class="doc-name">Persistence evolution</div><div class="doc-meta">130 SQL files covering 5 DBs and platform feature growth</div><span class="doc-badge db-ok">Implemented</span></div>
+  </div>
+</div>
+<div class="section" id="tab-verification">
+  <div class="alert alert-orange fade">
+    <h4>Verification summary</h4>
+    <p>The codebase is broad and compiles far enough for the frontends to build cleanly. The main verification gap is backend readiness behavior under no-Redis conditions, not a missing product implementation area.</p>
+  </div>
+  <p class="sh">Current Verification Snapshot</p>
+  <div class="itbl-wrap fade">
+    <table class="itbl">
+      <thead>
+        <tr><th>Check</th><th>Status</th><th>Evidence</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>mvn -q test</code> in <code>auth-server</code></td><td><span class="ipri p0">Failing</span></td><td><code>ObservabilityTest</code> and <code>SigningKeyRotationTest</code> fail because <code>/q/health/ready</code> returns <code>503</code> when Redis health is down.</td></tr>
+        <tr><td><code>npm run build</code> in <code>admin-ui</code></td><td><span class="ipri p2">Passing</span></td><td>Production bundle built successfully on 2026-04-12.</td></tr>
+        <tr><td><code>npm run build</code> in <code>account-ui</code></td><td><span class="ipri p2">Passing</span></td><td>Production bundle built successfully on 2026-04-12.</td></tr>
+        <tr><td><code>git status --short</code></td><td><span class="ipri p1">Dirty after tests</span></td><td>Tracked <code>auth-server/target/surefire-reports/*</code> files are modified by test execution.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="prog-grid fade d1">
+    <div class="prog-card">
+      <div class="prog-title">Verification health by area</div>
+      <div class="prog-row"><div class="prog-lbl">Backend compilation and runtime</div><div class="prog-bg"><div class="prog-fill" style="width:68%;background:var(--primary)"></div></div><div class="pc" style="color:#93c5fd">68%</div></div>
+      <div class="prog-row"><div class="prog-lbl">Frontend production builds</div><div class="prog-bg"><div class="prog-fill" style="width:100%;background:var(--green)"></div></div><div class="pc" style="color:var(--emerald)">100%</div></div>
+      <div class="prog-row"><div class="prog-lbl">Protocol and feature breadth</div><div class="prog-bg"><div class="prog-fill" style="width:92%;background:var(--green)"></div></div><div class="pc" style="color:var(--emerald)">92%</div></div>
+      <div class="prog-row"><div class="prog-lbl">Readiness and HA correctness</div><div class="prog-bg"><div class="prog-fill" style="width:58%;background:var(--orange)"></div></div><div class="pc" style="color:#fb923c">58%</div></div>
+    </div>
+    <div class="prog-card">
+      <div class="prog-title">Observed runtime risks</div>
+      <div class="prog-row"><div class="prog-lbl">Optional Redis breaks readiness</div><div class="prog-bg"><div class="prog-fill" style="width:100%;background:var(--red)"></div></div><div class="pc" style="color:#f87171">P0</div></div>
+      <div class="prog-row"><div class="prog-lbl">Tracked generated reports dirty repo</div><div class="prog-bg"><div class="prog-fill" style="width:82%;background:var(--yellow)"></div></div><div class="pc" style="color:#fbbf24">P1</div></div>
+      <div class="prog-row"><div class="prog-lbl">Full shared session externalization</div><div class="prog-bg"><div class="prog-fill" style="width:64%;background:var(--orange)"></div></div><div class="pc" style="color:#fb923c">P1</div></div>
+      <div class="prog-row"><div class="prog-lbl">Docs still lag a few late features</div><div class="prog-bg"><div class="prog-fill" style="width:70%;background:var(--primary)"></div></div><div class="pc" style="color:#93c5fd">P2</div></div>
+    </div>
+  </div>
+</div>
+<div class="section" id="tab-docs">
+  <p class="sh">Document Alignment Status</p>
+  <div class="doc-grid fade">
+    <div class="doc"><div class="doc-file">docs/task.md</div><div class="doc-name">Status board</div><div class="doc-meta">Updated to reflect April 12 verification state, Redis readiness drift, and repo hygiene issues.</div><span class="doc-badge db-ok">Updated</span></div>
+    <div class="doc"><div class="doc-file">docs/PRD.md</div><div class="doc-name">PRD</div><div class="doc-meta">Broadly aligned to the larger platform, but still understates some later SCIM outbound progress and current readiness drift.</div><span class="doc-badge db-warn">Partial drift</span></div>
+    <div class="doc"><div class="doc-file">docs/DEPLOYMENT_OPERATIONS.md</div><div class="doc-name">Operations docs</div><div class="doc-meta">Need a small follow-up once Redis/readiness behavior is fixed or explicitly documented.</div><span class="doc-badge db-warn">Needs review</span></div>
+    <div class="doc"><div class="doc-file">docs/SECURITY_COMPLIANCE.md</div><div class="doc-name">Security posture doc</div><div class="doc-meta">Still generally useful, but should reflect current shared-state and readiness caveats more directly.</div><span class="doc-badge db-warn">Needs review</span></div>
+    <div class="doc"><div class="doc-file">docs/API_DOC.md</div><div class="doc-name">API support boundary</div><div class="doc-meta">Still consistent at a high level with current implemented surfaces.</div><span class="doc-badge db-ok">Mostly aligned</span></div>
+    <div class="doc"><div class="doc-file">docs/DATABASE_SCHEMA.md</div><div class="doc-name">Schema baseline</div><div class="doc-meta">Should remain tied to Liquibase truth; late SCIM outbound additions may need another pass.</div><span class="doc-badge db-warn">Small drift risk</span></div>
+    <div class="doc"><div class="doc-file">docs/TTD.md</div><div class="doc-name">Technical design baseline</div><div class="doc-meta">Repo shape and architecture framing are still broadly correct.</div><span class="doc-badge db-ok">Mostly aligned</span></div>
+    <div class="doc"><div class="doc-file">docs/SSO_Build_Features.md</div><div class="doc-name">Master feature catalog</div><div class="doc-meta">Still the right place for target-state breadth; not the source of current verification truth.</div><span class="doc-badge db-dr">Reference only</span></div>
+  </div>
+  <div class="alert alert-blue fade d1">
+    <h4>Documentation read</h4>
+    <p>The documentation set is much better aligned than before, but it is no longer fully accurate if used as the only source of truth. The current task board and this analysis page are closer to the live branch than the PRD right now.</p>
+  </div>
+</div>
+<div class="section" id="tab-issues">
+  <p class="sh">Open Issues and Priority Register</p>
+  <div class="itbl-wrap fade">
+    <table class="itbl">
+      <thead>
+        <tr><th>Priority</th><th>Issue</th><th>Area</th><th>Why it matters</th><th>Recommended next move</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="ipri p0">P0</span></td><td>Optional Redis currently makes readiness fail</td><td>Phase 5 / backend</td><td>Breaks backend test suite and overstates operational readiness.</td><td>Decouple optional Redis from readiness or gate the health check by the same optional flag.</td></tr>
+        <tr><td><span class="ipri p1">P1</span></td><td>Full shared session state is still incomplete</td><td>Phase 5 / HA</td><td>Current session freshness is better, but full multi-node shared-session behavior still is not finished.</td><td>Externalize or formalize session state and session invalidation across replicas.</td></tr>
+        <tr><td><span class="ipri p1">P1</span></td><td>Tracked surefire reports dirty the repo</td><td>Repo hygiene</td><td>Routine verification creates noise and obscures real source changes.</td><td>Stop tracking generated surefire outputs and clean them from version control.</td></tr>
+        <tr><td><span class="ipri p1">P1</span></td><td>Federation and SCIM lifecycle still incomplete</td><td>Phase 4</td><td>Feature breadth is high, but deprovision, lifecycle, and policy semantics are not fully closed.</td><td>Finish LDAP, broker, and outbound SCIM lifecycle hardening.</td></tr>
+        <tr><td><span class="ipri p2">P2</span></td><td>PRD and companion docs have mild drift</td><td>Docs</td><td>Status communication is less trustworthy when docs trail the code.</td><td>Reconcile PRD and ops docs after the readiness issue is fixed.</td></tr>
+        <tr><td><span class="ipri p2">P2</span></td><td>RBAC, ABAC, consent, webhooks, SDKs remain missing</td><td>Future scope</td><td>These are still clearly not-started expansion tracks.</td><td>Keep them out of the near-term milestone until Phase 5 runtime issues are closed.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="section" id="tab-guide">
+  <div class="alert alert-orange fade">
+    <h4>Recommended execution order</h4>
+    <p>Do not add more feature breadth first. The next work should restore a fully green backend, then tighten operational truth in the docs, then continue the remaining Phase 4 and Phase 5 completion work.</p>
+  </div>
+  <p class="sh">Immediate Next Steps</p>
+  <div class="guide-grid fade">
+    <div class="gcard">
+      <div class="gcard-hdr"><span class="gcard-ico">01</span><span class="gcard-title">Fix Redis readiness behavior</span><span class="gcard-priority gp0">P0</span></div>
+      <div class="gcard-body">
+        <div class="gstep"><span class="gstep-num">1</span>Inspect the Redis health check and readiness path used by <code>/q/health/ready</code>.</div>
+        <div class="gstep"><span class="gstep-num">2</span>Make readiness consistent with <code>openidentity.rate-limit.redis-enabled</code> so optional Redis does not force a DOWN state.</div>
+        <div class="gstep"><span class="gstep-num">3</span>Re-run <code>mvn -q test</code> in <code>auth-server</code>.</div>
+        <div class="gtip">This is the current branch blocker. Fixing it should be the first move.</div>
+      </div>
+    </div>
+    <div class="gcard">
+      <div class="gcard-hdr"><span class="gcard-ico">02</span><span class="gcard-title">Clean tracked generated artifacts</span><span class="gcard-priority gp1">P1</span></div>
+      <div class="gcard-body">
+        <div class="gstep"><span class="gstep-num">1</span>Remove tracked <code>auth-server/target/surefire-reports/*</code> from version control.</div>
+        <div class="gstep"><span class="gstep-num">2</span>Keep ignore rules in place so routine local verification stays clean.</div>
+        <div class="gstep"><span class="gstep-num">3</span>Re-check <code>git status --short</code> after a full test run.</div>
+        <div class="gtip">This is not a product feature issue, but it materially affects day-to-day engineering hygiene.</div>
+      </div>
+    </div>
+    <div class="gcard">
+      <div class="gcard-hdr"><span class="gcard-ico">03</span><span class="gcard-title">Close remaining Phase 5 HA gaps</span><span class="gcard-priority gp1">P1</span></div>
+      <div class="gcard-body">
+        <div class="gstep"><span class="gstep-num">1</span>Finish true shared session-state behavior across replicas.</div>
+        <div class="gstep"><span class="gstep-num">2</span>Validate session invalidation and session freshness across multi-node scenarios.</div>
+        <div class="gstep"><span class="gstep-num">3</span>Reconcile health, readiness, and optional infrastructure dependencies.</div>
+        <div class="gtip">Phase 5 already has real assets. The remaining work is about correctness and operability, not greenfield setup.</div>
+      </div>
+    </div>
+    <div class="gcard">
+      <div class="gcard-hdr"><span class="gcard-ico">04</span><span class="gcard-title">Then finish Phase 4 lifecycle depth</span><span class="gcard-priority gp2">P2</span></div>
+      <div class="gcard-body">
+        <div class="gstep"><span class="gstep-num">1</span>Complete LDAP lifecycle reconciliation and policy handling.</div>
+        <div class="gstep"><span class="gstep-num">2</span>Broaden OIDC and SAML broker lifecycle controls.</div>
+        <div class="gstep"><span class="gstep-num">3</span>Finish outbound SCIM lifecycle semantics and deprovision depth.</div>
+        <div class="gtip">The codebase already has strong breadth here. Remaining work is mostly closure and hardening.</div>
+      </div>
+    </div>
+  </div>
+  <p class="sh">Operator Quick Reference</p>
+  <div class="guide-grid fade d1">
+    <div class="gcard">
+      <div class="gcard-hdr"><span class="gcard-ico">RUN</span><span class="gcard-title">Verification commands</span><span class="gcard-priority gp2">Reference</span></div>
+      <div class="gcard-body">
+        <div class="gstep"><span class="gstep-num">1</span><code>cd auth-server &amp;&amp; mvn -q test</code></div>
+        <div class="gstep"><span class="gstep-num">2</span><code>cd admin-ui &amp;&amp; npm run build</code></div>
+        <div class="gstep"><span class="gstep-num">3</span><code>cd account-ui &amp;&amp; npm run build</code></div>
+        <div class="gtip">As of 2026-04-12, only the backend suite is red, and the immediate cause is the readiness path.</div>
+      </div>
+    </div>
+    <div class="gcard">
+      <div class="gcard-hdr"><span class="gcard-ico">DOC</span><span class="gcard-title">Current truth hierarchy</span><span class="gcard-priority gp2">Reference</span></div>
+      <div class="gcard-body">
+        <div class="gstep"><span class="gstep-num">1</span>Use the source tree first for capability truth.</div>
+        <div class="gstep"><span class="gstep-num">2</span>Use <code>docs/task.md</code> next for current status.</div>
+        <div class="gstep"><span class="gstep-num">3</span>Use <code>docs/PRD.md</code> for roadmap framing, but treat some limitation text as mildly stale.</div>
+        <div class="gtip">This HTML page is intended to bridge the current source-vs-doc gap until the docs are fully reconciled again.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<footer>
+  <div class="foot">
+    <div class="foot-l">OpenIdentity analysis dashboard - generated from repo scan, docs review, and local verification on April 12, 2026.</div>
+    <div class="foot-tags">
+      <span class="ftag">quarkus-3.8</span>
+      <span class="ftag">java-21</span>
+      <span class="ftag">react-18</span>
+      <span class="ftag">phase-1-3-complete</span>
+      <span class="ftag">phase-4-5-in-progress</span>
+      <span class="ftag">backend-not-green</span>
+    </div>
+  </div>
+</footer>
+<script>
+function showTab(id, el){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  el.classList.add('active');
+  animateBars();
+}
+function togglePhase(hdr){
+  const body = hdr.nextElementSibling;
+  body.classList.toggle('open');
+}
+function animateBars(){
+  document.querySelectorAll('.prog-fill,.mini-fill').forEach(b=>{
+    const w=b.style.width;b.style.transition='none';b.style.width='0%';
+    requestAnimationFrame(()=>setTimeout(()=>{b.style.transition='width 1.6s cubic-bezier(.22,1,.36,1)';b.style.width=w;},60));
+  });
+}
+window.addEventListener('load',()=>{
+  const arc=document.getElementById('scoreArc');
+  if(arc){
+    const final=parseFloat(arc.getAttribute('stroke-dashoffset'));
+    arc.setAttribute('stroke-dashoffset','427.3');
+    arc.style.transition='stroke-dashoffset 2s cubic-bezier(.22,1,.36,1)';
+    setTimeout(()=>arc.setAttribute('stroke-dashoffset',final),300);
+  }
+  const firstBody=document.querySelector('.ph-body');
+  if(firstBody)firstBody.classList.add('open');
+  animateBars();
+});
+</script>
+</body>
+</html>

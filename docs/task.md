@@ -12,6 +12,15 @@ This file tracks delivery status for the current product baseline and the phased
 - `Blocked`: cannot proceed until a dependency lands.
 - `Not Started`: acknowledged work with no active implementation yet.
 
+## Current Verification Snapshot (2026-04-12)
+
+| Check | Status | Note |
+| --- | --- | --- |
+| Backend `mvn -q test` | In Progress | Fails in `ObservabilityTest` and `SigningKeyRotationTest` because `/q/health/ready` returns `503` when the Redis health check is `DOWN` and Redis is not configured locally. |
+| Frontend `admin-ui` build | Complete | `npm run build` passed on 2026-04-12. |
+| Frontend `account-ui` build | Complete | `npm run build` passed on 2026-04-12. |
+| Worktree hygiene | In Progress | Source files are clean, but tracked `auth-server/target/surefire-reports/*` outputs become dirty after backend test runs. |
+
 ## Phase 1: MVP Hardening and Security Baseline
 
 
@@ -85,8 +94,8 @@ This file tracks delivery status for the current product baseline and the phased
 | ----------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
 | Current CI pipeline                       | Complete    | Build/test/audit/CodeQL workflow exists                                                                                                                                                                                                                                                                                                                                                                                                                                    | -                      |
 | Production deployment assets              | Complete    | Dockerfile (multi-stage), docker-compose.yml, K8s manifests (namespace/secret/configmap/deployment/service/ingress/postgres/hpa), Helm chart (openidentity) added under deploy/                                                                                                                                                                                                                                                                                            | Earlier product phases |
-| Metrics/tracing/operational observability | Complete    | ObservabilityService: login/logout/introspect/admin-action counters, active-session gauge, key-age gauge, grant latency timer; ObservabilityRefreshJob every 60s; Grafana dashboard at deploy/grafana/dashboard.json; TracingService wraps token grant/LDAP/broker/SAML/key-rotation in OTel spans; quarkus-opentelemetry added to pom.xml; OTLP config in application.properties; otel-collector.yaml + docker-compose service added; W3C traceparent propagation enabled | Earlier product phases |
-| Shared session/rate-limit state           | In Progress | Token rate limiting now supports optional Redis-backed shared counters behind openidentity.rate-limit.redis-enabled plus quarkus.redis.hosts; DB-backed user sessions now refresh `lastRefresh` on verified bearer traffic across nodes, but full shared session/state externalization and HA still remain partial                                                                                                                                                             | Earlier product phases |
+| Metrics/tracing/operational observability | In Progress | ObservabilityService counters/gauges/timers, OTel spans, Grafana dashboard, and collector config all exist, but readiness currently goes `DOWN` when Redis is absent and is breaking backend observability/key-rotation tests; health behavior still needs alignment with optional Redis mode                                                                                                                                                                             | Earlier product phases |
+| Shared session/rate-limit state           | In Progress | Token rate limiting supports optional Redis-backed shared counters behind `openidentity.rate-limit.redis-enabled` plus `quarkus.redis.hosts`; DB-backed user sessions now refresh `lastRefresh` on verified bearer traffic across nodes, but full shared session/state externalization and HA still remain partial, and Redis/readiness coupling still needs cleanup                                                                                                     | Earlier product phases |
 | Backup/restore runbooks                   | Complete    | docs/RUNBOOK_BACKUP_RESTORE.md added — covers pg_dump/restore, signing key backup/recovery, Liquibase rollback, and RTO/RPO targets                                                                                                                                                                                                                                                                                                                                        | Earlier product phases |
 | Release quality gates beyond current CI   | Complete    | ci.yml expanded with: OWASP dependency-check job (failBuildOnCVSS=8, HTML+JSON report artifact); container image scan job via Trivy (CRITICAL+HIGH, ignore-unfixed); staging smoke-test job (push-only) that boots auth-server against PostgreSQL and validates health, JWKS, discovery URLs, admin API, and metrics endpoint; .owasp-suppressions.xml stub committed                                                                                                      | Earlier product phases |
 
@@ -112,10 +121,10 @@ This file tracks delivery status for the current product baseline and the phased
 
 | Task                                            | Status   | Note                                                       | Dependency |
 | ----------------------------------------------- | -------- | ---------------------------------------------------------- | ---------- |
-| PRD updated                                     | Complete | PRD reconciled to the implemented Phase 1-5 baseline and current remaining gaps | -          |
+| PRD updated                                     | In Progress | PRD is largely reconciled, but current limitation text still understates later SCIM outbound progress and does not reflect the current Redis/readiness verification drift | -          |
 | TTD aligned to PRD                              | Complete | Technical baseline reflects current repo shape             | PRD        |
 | UI/UX spec aligned to PRD                       | Complete | Current/admin account surfaces separated from future UX    | PRD        |
 | Test docs aligned to current code               | Complete | Test plan and test cases now distinguish current vs future | PRD        |
 | API docs reconciled with code                   | Complete | Supported/constrained/planned endpoints separated          | PRD        |
 | Schema doc reconciled with migrations           | Complete | Current persisted model now tied to Liquibase truth        | PRD        |
-| Deployment/infrastructure/security docs aligned | Complete | Current vs future operational posture is separated         | PRD        |
+| Deployment/infrastructure/security docs aligned | In Progress | Operational posture is mostly separated, but current Redis/readiness behavior and backend verification state still need reconciliation across the docs | PRD        |

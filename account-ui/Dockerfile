@@ -33,12 +33,12 @@ RUN printf 'server {\n\
         try_files $uri $uri/ /index.html;\n\
     }\n\
     location /account/ {\n\
-        proxy_pass http://openidentity-auth:7070;\n\
+        proxy_pass http://auth-server:7070;\n\
         proxy_set_header Host $host;\n\
         proxy_set_header X-Real-IP $remote_addr;\n\
     }\n\
     location /auth/ {\n\
-        proxy_pass http://openidentity-auth:7070;\n\
+        proxy_pass http://auth-server:7070;\n\
         proxy_set_header Host $host;\n\
         proxy_set_header X-Real-IP $remote_addr;\n\
     }\n\

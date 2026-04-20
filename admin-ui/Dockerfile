@@ -25,17 +25,17 @@ RUN printf 'server {\n\
     # Proxy API calls to auth-server (override VITE_API_URL at build time\n\
     # or set the auth-server URL in nginx upstream for production)\n\
     location /admin/ {\n\
-        proxy_pass http://openidentity-auth:7070;\n\
+        proxy_pass http://auth-server:7070;\n\
         proxy_set_header Host $host;\n\
         proxy_set_header X-Real-IP $remote_addr;\n\
     }\n\
     location /auth/ {\n\
-        proxy_pass http://openidentity-auth:7070;\n\
+        proxy_pass http://auth-server:7070;\n\
         proxy_set_header Host $host;\n\
         proxy_set_header X-Real-IP $remote_addr;\n\
     }\n\
     location /q/ {\n\
-        proxy_pass http://openidentity-auth:7070;\n\
+        proxy_pass http://auth-server:7070;\n\
         proxy_set_header Host $host;\n\
     }\n\
 }\n' > /etc/nginx/conf.d/default.conf

@@ -11,6 +11,10 @@ FROM eclipse-temurin:21-jre-jammy
 LABEL org.opencontainers.image.title="openidentity-auth-server"
 LABEL org.opencontainers.image.description="OpenIdentity auth server"
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd -r openid && useradd -r -g openid openid
 WORKDIR /app
 COPY --from=build /build/target/quarkus-app ./
