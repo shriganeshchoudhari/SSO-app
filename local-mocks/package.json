@@ -1,0 +1,15 @@
+{
+  "name": "openidentity-local-mocks",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local OIDC demo, SCIM target, and SAML IdP shims for OpenIdentity",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "^0.8.10",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2"
+  }
+}

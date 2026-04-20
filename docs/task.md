@@ -12,14 +12,31 @@ This file tracks delivery status for the current product baseline and the phased
 - `Blocked`: cannot proceed until a dependency lands.
 - `Not Started`: acknowledged work with no active implementation yet.
 
-## Current Verification Snapshot (2026-04-12)
+## Current Verification Snapshot (2026-04-20)
 
 | Check | Status | Note |
 | --- | --- | --- |
-| Backend `mvn -q test` | In Progress | Fails in `ObservabilityTest` and `SigningKeyRotationTest` because `/q/health/ready` returns `503` when the Redis health check is `DOWN` and Redis is not configured locally. |
-| Frontend `admin-ui` build | Complete | `npm run build` passed on 2026-04-12. |
-| Frontend `account-ui` build | Complete | `npm run build` passed on 2026-04-12. |
-| Worktree hygiene | In Progress | Source files are clean, but tracked `auth-server/target/surefire-reports/*` outputs become dirty after backend test runs. |
+| Compose `docker compose --profile full config` | Complete | Full-profile local runtime configuration now resolves with `postgres`, `redis`, `auth-server`, `admin-ui`, `account-ui`, `otel-collector`, `bootstrap`, `openldap`, `dex`, `simplesamlphp`, and `mock-scim-target`. |
+| Compose `docker compose --profile full up -d --build` | Blocked | Repo implementation is in place, but the current machine does not have a running Docker daemon (`dockerDesktopLinuxEngine` pipe missing), so end-to-end startup could not be executed from this session. |
+| Compose `docker compose run --rm bootstrap` | Blocked | Bootstrap container is implemented, but validation is blocked behind the unavailable Docker daemon. |
+| Worktree hygiene | In Progress | Source changes for the local full-run stack are present, and tracked `auth-server/target/*` outputs still dirty the worktree after backend test runs. |
+
+## Local Full-Run Milestone
+
+| Task | Status | Note | Dependency |
+| --- | --- | --- | --- |
+| Canonical Docker-first startup path | Complete | `docker compose --profile full up -d --build` and `docker compose run --rm bootstrap` are now the documented local workflow | - |
+| Auth-server container healthcheck runtime fix | Complete | Root runtime image now installs `curl`, matching the compose and Docker healthcheck commands | Existing backend container |
+| Optional Redis readiness outside Compose | Complete | `quarkus.redis.health.enabled` is now environment-controlled so local non-Redis runs do not fail readiness by default | Existing backend config |
+| Local-only recovery token return | Complete | Compose enables `OPENIDENTITY_DEV_RETURN_TOKENS=true` for password reset and email verification flows | Existing backend config |
+| Seeded account-ui runtime defaults | Complete | `account-ui` now runs with seeded `demo` realm and `account` client defaults in Compose | Existing account UI runtime config |
+| Deterministic bootstrap container | Complete | Containerized bootstrap script now waits for readiness, seeds realm/users/roles/clients, and configures LDAP, OIDC, SAML, and SCIM targets idempotently | Auth-server admin APIs |
+| Full-profile local integration services | Complete | `openldap`, `dex`, `simplesamlphp`, and `mock-scim-target` are now wired into the `full` profile | Canonical compose stack |
+| Local OIDC browser demo | Complete | `mock-scim-target` now serves a browser demo that exercises hosted login, auth code + PKCE, and refresh token exchange through the seeded `browser-demo` client | Seeded browser client |
+| Local outbound SCIM inspection surface | Complete | `mock-scim-target` now exposes SCIM-compatible CRUD plus an inspection UI for synced users and groups | Seeded outbound SCIM target |
+| Local SAML IdP shim | Complete | A deterministic local SAML broker target now exists under the `simplesamlphp` service slot for broker login and logout testing | Seeded SAML provider config |
+| Authoritative local runbook | Complete | `docs/LOCAL_FULL_RUN.md` now defines startup commands, URLs, credentials, and verification steps | Canonical compose stack |
+| End-to-end compose validation on this machine | Blocked | The compose stack and bootstrap container cannot be exercised until Docker Desktop is running | Running Docker daemon |
 
 ## Phase 1: MVP Hardening and Security Baseline
 
@@ -113,7 +130,7 @@ This file tracks delivery status for the current product baseline and the phased
 | Provisioning and federation            | In Progress | LDAP, OIDC broker, and SAML broker all exist as before; SCIM now covers Users, Groups, richer PATCH/filter behavior, Bulk operations, linked-user provisioning, group-role mapping, configurable linked-user deprovision lifecycle, outbound target config with manual user sync, manual outbound group sync, opt-in automatic outbound sync on local user changes, opt-in automatic outbound group sync on local SCIM group changes, scheduled reconciliation for opted-in outbound targets, and opt-in remote delete propagation for locally deleted synced users and groups, while broader outbound provisioning lifecycle still remains | Phase 4      |
 | Developer APIs, SDKs, and webhooks     | Not Started | Covers config-as-code, SDKs, event delivery, and expanded platform APIs                                                                                                                                                                                                                  | Phase 4-5    |
 | Audit, monitoring, and compliance      | In Progress | Admin UI surfaces audit/login events; ObservabilityService covers counters/gauges/timers; TracingService emits OTel spans for all major flows; Grafana dashboard shipped; OWASP dep-check and Trivy container scan in CI; distributed alerting and GDPR/compliance features still remain | Phase 3-5    |
-| Deployment and infrastructure maturity | In Progress | Dockerfile, docker-compose, K8s manifests, Helm chart, OTel collector config, backup/restore runbook, OWASP+Trivy+smoke-test CI gates all shipped; Redis-backed rate limiting and DB-backed session freshness now support better multi-node behavior, but full shared session/state externalization for HA still remains                                                                     | Phase 5      |
+| Deployment and infrastructure maturity | In Progress | Dockerfile, docker-compose, K8s manifests, Helm chart, OTel collector config, backup/restore runbook, OWASP+Trivy+smoke-test CI gates, and a canonical Docker-first local full-run workflow are now shipped; Redis-backed rate limiting and DB-backed session freshness support better multi-node behavior, but full shared session/state externalization for HA still remains | Phase 5      |
 
 
 ## Documentation Alignment
@@ -127,4 +144,4 @@ This file tracks delivery status for the current product baseline and the phased
 | Test docs aligned to current code               | Complete | Test plan and test cases now distinguish current vs future | PRD        |
 | API docs reconciled with code                   | Complete | Supported/constrained/planned endpoints separated          | PRD        |
 | Schema doc reconciled with migrations           | Complete | Current persisted model now tied to Liquibase truth        | PRD        |
-| Deployment/infrastructure/security docs aligned | In Progress | Operational posture is mostly separated, but current Redis/readiness behavior and backend verification state still need reconciliation across the docs | PRD        |
+| Deployment/infrastructure/security docs aligned | In Progress | Deployment and local runtime docs now reflect the Docker-first workflow, but broader infrastructure/security docs still need a final reconciliation pass against the latest local milestone and remaining Phase 5 gaps | PRD        |

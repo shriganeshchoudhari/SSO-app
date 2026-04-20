@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -28,6 +26,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "7070:7070"
     environment:
@@ -36,14 +36,17 @@ services:
       DB_USERNAME: postgres
       DB_PASSWORD: postgres
       HTTP_PORT: "7070"
-      # Generate a strong random value for production:
-      OPENIDENTITY_ADMIN_BOOTSTRAP_TOKEN: "change-me-in-production"
-      OPENIDENTITY_SECRET_PROTECTION_KEY: "change-me-in-production"
-      # Leave blank to auto-generate RS256 key on first boot (persisted to DB):
+      JWT_ISSUER: "http://localhost:7070"
+      OPENIDENTITY_ADMIN_BOOTSTRAP_TOKEN: "local-bootstrap-token"
+      OPENIDENTITY_SECRET_PROTECTION_KEY: "local-secret-protection-key"
       OPENIDENTITY_JWT_PRIVATE_KEY_PEM: ""
       OPENIDENTITY_JWT_PUBLIC_KEY_PEM: ""
-      # Redis for shared rate-limit state across replicas:
       REDIS_URL: "redis://redis:6379"
+      OPENIDENTITY_RATE_LIMIT_REDIS_ENABLED: "true"
+      OPENIDENTITY_REDIS_HEALTH_ENABLED: "true"
+      OPENIDENTITY_DEV_RETURN_TOKENS: "true"
+      OTEL_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:7070/q/health/ready || exit 1"]
       interval: 15s
@@ -72,6 +75,9 @@ services:
       - "3001:80"
     depends_on:
       - auth-server
+    environment:
+      OI_REALM: demo
+      OI_CLIENT_ID: account
 
   redis:
     image: redis:7-alpine
@@ -99,5 +105,102 @@ services:
     depends_on:
       - auth-server
 
+  bootstrap:
+    build:
+      context: local/bootstrap
+      dockerfile: Dockerfile
+    environment:
+      AUTH_BASE_URL_INTERNAL: "http://auth-server:7070"
+      AUTH_BASE_URL_EXTERNAL: "http://localhost:7070"
+      OPENIDENTITY_ADMIN_BOOTSTRAP_TOKEN: "local-bootstrap-token"
+    depends_on:
+      auth-server:
+        condition: service_healthy
+
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: openidentity-openldap
+    restart: unless-stopped
+    profiles: ["full"]
+    environment:
+      LDAP_ORGANISATION: "OpenIdentity"
+      LDAP_DOMAIN: "example.org"
+      LDAP_ADMIN_PASSWORD: "admin"
+      LDAP_TLS: "false"
+    ports:
+      - "3890:389"
+    volumes:
+      - ./deploy/local/openldap/01-demo-users.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/01-demo-users.ldif:ro
+    healthcheck:
+      test: ["CMD-SHELL", "ldapsearch -x -H ldap://localhost:389 -D 'cn=admin,dc=example,dc=org' -w admin -b 'ou=people,dc=example,dc=org' '(uid=ldap.user)' >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+
+  dex:
+    image: ghcr.io/dexidp/dex:v2.41.1
+    container_name: openidentity-dex
+    restart: unless-stopped
+    profiles: ["full"]
+    command: ["dex", "serve", "/etc/dex/config.yaml"]
+    volumes:
+      - ./deploy/local/dex/config.yaml:/etc/dex/config.yaml:ro
+    ports:
+      - "5556:5556"
+
+  mock-scim-target:
+    build:
+      context: local-mocks
+      dockerfile: Dockerfile
+    container_name: openidentity-mock-scim
+    restart: unless-stopped
+    profiles: ["full"]
+    environment:
+      MOCK_ROLE: scim
+      PORT: "8090"
+      DATA_DIR: "/data"
+      SCIM_BEARER_TOKEN: "mock-scim-token"
+      AUTH_BASE_URL_INTERNAL: "http://auth-server:7070"
+      AUTH_BASE_URL_EXTERNAL: "http://localhost:7070"
+      OIDC_DEMO_REALM: "demo"
+      OIDC_DEMO_CLIENT_ID: "browser-demo"
+      OIDC_DEMO_REDIRECT_URI: "http://localhost:8090/oidc-demo/callback"
+    ports:
+      - "8090:8090"
+    volumes:
+      - mock_scim_data:/data
+    depends_on:
+      auth-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8090/health >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  simplesamlphp:
+    build:
+      context: local-mocks
+      dockerfile: Dockerfile
+    container_name: openidentity-saml-idp
+    restart: unless-stopped
+    profiles: ["full"]
+    environment:
+      MOCK_ROLE: saml
+      PORT: "8082"
+      SAML_ENTITY_ID: "http://localhost:8082/simplesaml/idp"
+      SAML_SP_SLO_URL: "http://localhost:7070/auth/realms/demo/broker/saml/simplesamlphp/slo"
+      SAML_USERNAME: "saml.user@example.com"
+      SAML_EMAIL: "saml.user@example.com"
+      SAML_PASSWORD: "Saml123!"
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/health >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
 volumes:
   pgdata:
+  mock_scim_data:

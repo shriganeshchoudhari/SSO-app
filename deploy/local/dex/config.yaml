@@ -1,0 +1,24 @@
+issuer: http://localhost:5556/dex
+storage:
+  type: memory
+
+web:
+  http: 0.0.0.0:5556
+
+oauth2:
+  skipApprovalScreen: true
+
+enablePasswordDB: true
+
+staticClients:
+  - id: openidentity-broker
+    redirectURIs:
+      - http://localhost:7070/auth/realms/demo/broker/oidc/dex/callback
+    name: OpenIdentity Local Broker
+    secret: openidentity-broker-secret
+
+staticPasswords:
+  - email: broker.user@example.com
+    hash: "$2a$10$2IQjKBgkTIKXeUTtxp2Hvur742StKfxcHncvv9wIYtF8kyCsI/8Tu"
+    username: broker.user
+    userID: broker-user

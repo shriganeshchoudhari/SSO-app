@@ -1,85 +1,100 @@
 # Deployment and Operations - OpenIdentity
 
 ## Document Intent
-This document describes what can be run and operated from the current repository today, plus the operational work required for later phases. It does not present future deployment assets as if they already exist.
+This document describes the current deployment assets and the canonical local runtime path from the repository as it exists today. It is delivery-accurate: it separates what is already runnable from what still remains as Phase 5 hardening work.
 
-## Current Runnable Setup
+## Current Deployment Assets
 
-### Backend
-- Service: `auth-server`
-- Default port: `7070`
-- Runtime: Quarkus on Java 21
-- Health endpoint: `/api/health`
+### Container Assets
+- Backend container image via the root [Dockerfile](/F:/SSO-app/Dockerfile)
+- Frontend container images via [admin-ui/Dockerfile](/F:/SSO-app/admin-ui/Dockerfile) and [account-ui/Dockerfile](/F:/SSO-app/account-ui/Dockerfile)
+- Canonical local orchestration via [docker-compose.yml](/F:/SSO-app/docker-compose.yml)
+- Local bootstrap container via [local/bootstrap/Dockerfile](/F:/SSO-app/local/bootstrap/Dockerfile)
+- Local integration mock container via [local-mocks/Dockerfile](/F:/SSO-app/local-mocks/Dockerfile)
 
-### Frontends
-- `admin-ui` Vite dev server on `5000`
-- `account-ui` Vite dev server on `5100`
-- Dev proxy behavior:
-  - admin UI proxies `/admin` to backend
-  - account UI proxies `/admin` and `/auth` to backend
+### Infrastructure Assets
+- Kubernetes manifests under [deploy/k8s](/F:/SSO-app/deploy/k8s)
+- Helm chart under [deploy/helm/openidentity](/F:/SSO-app/deploy/helm/openidentity)
+- OpenTelemetry collector config under [deploy/otel/otel-collector.yaml](/F:/SSO-app/deploy/otel/otel-collector.yaml)
+- Grafana dashboard under [deploy/grafana/dashboard.json](/F:/SSO-app/deploy/grafana/dashboard.json)
+- Backup and restore runbook in [RUNBOOK_BACKUP_RESTORE.md](/F:/SSO-app/docs/RUNBOOK_BACKUP_RESTORE.md)
 
-### Auxiliary Server
-- Root `index.js` can run an Express health-check service on `3000`, but it is not part of the main auth runtime path.
+## Canonical Local Runtime
 
-## Current Configuration
+### Startup Flow
+1. `docker compose --profile full up -d --build`
+2. `docker compose run --rm bootstrap`
 
-### Backend Environment Variables
-- `HTTP_PORT`
+### Core Services
+- `postgres`
+- `redis`
+- `auth-server`
+- `admin-ui`
+- `account-ui`
+- `otel-collector`
+- `bootstrap`
+
+### Full-Profile Local Integration Services
+- `openldap`
+- `dex`
+- `simplesamlphp`
+  Note: this is a deterministic repo-owned SAML IdP shim exposed under the `simplesamlphp` service slot for local full-run flows.
+- `mock-scim-target`
+
+### Current Local Defaults
+- Realm: `demo`
+- Account client: `account`
+- Admin token helper client: `admin-cli`
+- Browser OIDC demo client: `browser-demo`
+- Bootstrap token: `local-bootstrap-token`
+- Local-only password-reset and email-verification token return is enabled in Compose for development use
+
+## Runtime Configuration
+
+### Backend Environment
 - `DB_KIND`
 - `DB_URL`
 - `DB_USERNAME`
 - `DB_PASSWORD`
-- `JWT_SIGN_KEY`
-- `JWT_SIGN_ALG`
+- `HTTP_PORT`
 - `JWT_ISSUER`
-- `SESSION_IDLE_TIMEOUT_SECONDS`
-- `openidentity.dev.return-tokens` for development/testing recovery flows
+- `OPENIDENTITY_ADMIN_BOOTSTRAP_TOKEN`
+- `OPENIDENTITY_SECRET_PROTECTION_KEY`
+- `OPENIDENTITY_JWT_PRIVATE_KEY_PEM`
+- `OPENIDENTITY_JWT_PUBLIC_KEY_PEM`
+- `REDIS_URL`
+- `OPENIDENTITY_RATE_LIMIT_REDIS_ENABLED`
+- `OPENIDENTITY_REDIS_HEALTH_ENABLED`
+- `OPENIDENTITY_DEV_RETURN_TOKENS`
+- `OTEL_ENABLED`
+- `OTEL_EXPORTER_OTLP_ENDPOINT`
 
-### Current Database Modes
-- PostgreSQL is the default runtime target.
-- H2 is available for local/test use.
-- MySQL, MariaDB, and Oracle are supported through included drivers and DB-specific Liquibase change sets.
+### Frontend Runtime Defaults
+- `account-ui` uses `OI_REALM=demo`
+- `account-ui` uses `OI_CLIENT_ID=account`
+- `admin-ui` still uses bearer-token entry rather than a productized admin login flow
 
-## Current CI and Build Behavior
-- Backend build and tests run in GitHub Actions.
-- Frontend production builds run in GitHub Actions.
-- Frontend dependency audits run in GitHub Actions.
-- CodeQL analysis is part of the current CI workflow.
-- There are no committed production deployment manifests or container definitions in the repository.
+## Local Full-Run Reference
+The authoritative operator-facing instructions for the Docker-first local environment live in [LOCAL_FULL_RUN.md](/F:/SSO-app/docs/LOCAL_FULL_RUN.md).
 
 ## Current Operational Reality
-- Local/dev operation is the supported runtime model today.
-- Database migrations run through Liquibase at backend startup.
-- Session cleanup groundwork exists in the backend.
-- JSON logging is enabled in the backend configuration.
 
-## Not Yet Available
-- Committed Dockerfiles or container image definitions.
-- Committed Kubernetes manifests or Helm charts.
-- Zero-downtime rollout assets.
-- Backup/restore runbooks.
-- Repository-backed monitoring/alerting stack.
-- Production operations guide for staging/prod deployment.
+### What Works in the Repo
+- Docker-first local startup path is now implemented in source control
+- Deterministic local bootstrap data exists
+- LDAP, OIDC broker, SAML broker, and SCIM outbound all have local mock or local-service coverage in the full profile
+- Backend health, readiness, metrics, and tracing surfaces exist
+- CI includes build, test, dependency audit, image scanning, and staging smoke coverage
 
-## Phase 5 Production Roadmap
+### What Still Remains
+- Full compose verification depends on a working local Docker daemon
+- The SAML local service is a deterministic shim for local broker testing, not a production IdP deployment
+- Shared HA session state is still not fully externalized
+- Production rollout hardening, alerting, and broader HA behavior remain Phase 5 work
 
-### Target Deliverables
-- Production deployment assets.
-- Operational runbooks for startup, shutdown, migration, backup, and recovery.
-- Metrics/tracing/logging baseline.
-- Shared-state design where required for sessions and rate limits.
-- Release quality gates and deploy smoke validation.
-
-### Dependencies
-- Earlier security and protocol phases must land first so production assets do not freeze insecure behavior into operations.
-
-## Future Operational Capability Coverage from the Master Catalog
-
-### Phase 4-5 Coverage
-- Containerization and deployment packaging.
-- Kubernetes / Helm deployment patterns if adopted.
-- TLS/ingress and reverse proxy operational model.
-- Metrics, logging, tracing, and alerting.
-- Backup/restore and operational runbooks.
-- CI/CD maturity and release automation.
-- Shared-state operations for sessions and rate limits when the product requires them.
+## Production and Later-Phase Gaps
+- Full HA session/state externalization
+- Broader operational alerting and dashboards
+- Production-grade reverse proxy, TLS, and ingress hardening
+- Zero-downtime rollout procedures
+- Stronger multi-environment deployment promotion and release automation
