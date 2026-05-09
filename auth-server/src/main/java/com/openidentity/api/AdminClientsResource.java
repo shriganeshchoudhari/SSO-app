@@ -5,6 +5,7 @@ import com.openidentity.api.dto.ClientDtos.UpdateClientRequest;
 import com.openidentity.api.dto.ClientDtos.ClientResponse;
 import com.openidentity.domain.ClientEntity;
 import com.openidentity.domain.RealmEntity;
+import com.openidentity.service.EventService;
 import com.openidentity.service.SecretProtectionService;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
 public class AdminClientsResource {
   @Inject EntityManager em;
   @Inject SecretProtectionService secretProtectionService;
+  @Inject EventService eventService;
 
   @GET
   public List<ClientResponse> list(@PathParam("realmId") UUID realmId,
@@ -84,6 +86,8 @@ public class AdminClientsResource {
     c.setRedirectUris(req.redirectUris);
     c.setGrantTypes(req.grantTypes);
     em.persist(c);
+    eventService.adminEvent(
+        realm, null, "create", "client", c.getId().toString(), null, "clientId=" + c.getClientId());
     return Response.created(URI.create(String.format("/admin/realms/%s/clients/%s", realmId, c.getId())))
         .entity(new ClientResponse(
             c.getId(),
@@ -108,6 +112,8 @@ public class AdminClientsResource {
     if (req.consentRequired != null) c.setConsentRequired(req.consentRequired);
     if (req.redirectUris != null) c.setRedirectUris(req.redirectUris);
     if (req.grantTypes != null) c.setGrantTypes(req.grantTypes);
+    eventService.adminEvent(
+        c.getRealm(), null, "update", "client", c.getId().toString(), null, "clientId=" + c.getClientId());
     return Response.noContent().build();
   }
 
@@ -117,6 +123,8 @@ public class AdminClientsResource {
   public Response delete(@PathParam("realmId") UUID realmId, @PathParam("clientId") UUID id) {
     ClientEntity c = em.find(ClientEntity.class, id);
     if (c == null || !c.getRealm().getId().equals(realmId)) throw new NotFoundException();
+    eventService.adminEvent(
+        c.getRealm(), null, "delete", "client", c.getId().toString(), null, "clientId=" + c.getClientId());
     em.remove(c);
     return Response.noContent().build();
   }

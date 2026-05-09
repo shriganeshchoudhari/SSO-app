@@ -65,6 +65,21 @@ function registerScimAndDemoRoutes() {
     res.json(loadState(stateFile));
   });
 
+  app.post("/webhooks/openidentity", (req, res) => {
+    const state = loadState(stateFile);
+    state.webhooks.unshift({
+      id: crypto.randomUUID(),
+      receivedAt: new Date().toISOString(),
+      eventType: req.get("x-openidentity-event") || null,
+      deliveryId: req.get("x-openidentity-delivery-id") || null,
+      signature: req.get("x-openidentity-signature") || null,
+      payload: req.body || null,
+    });
+    state.webhooks = state.webhooks.slice(0, 100);
+    saveState(stateFile, state);
+    res.status(202).json({ accepted: true });
+  });
+
   app.get("/oidc-demo", (_req, res) => {
     res.type("html").send(renderOidcDemoPage());
   });
@@ -311,12 +326,17 @@ function ensureDir(dirPath) {
 
 function loadState(stateFile) {
   if (!fs.existsSync(stateFile)) {
-    return { users: {}, groups: {} };
+    return { users: {}, groups: {}, webhooks: [] };
   }
   try {
-    return JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    return {
+      users: state.users || {},
+      groups: state.groups || {},
+      webhooks: Array.isArray(state.webhooks) ? state.webhooks : [],
+    };
   } catch (_error) {
-    return { users: {}, groups: {} };
+    return { users: {}, groups: {}, webhooks: [] };
   }
 }
 
@@ -529,6 +549,10 @@ function renderInspectPage() {
       <h2>Remote Groups</h2>
       <pre id="groups">Loading...</pre>
     </section>
+    <section class="card">
+      <h2>Webhook Deliveries</h2>
+      <pre id="webhooks">Loading...</pre>
+    </section>
   </div>
   <script>
     fetch('/inspect/state')
@@ -536,10 +560,12 @@ function renderInspectPage() {
       .then((state) => {
         document.getElementById('users').textContent = JSON.stringify(Object.values(state.users || {}), null, 2)
         document.getElementById('groups').textContent = JSON.stringify(Object.values(state.groups || {}), null, 2)
+        document.getElementById('webhooks').textContent = JSON.stringify(state.webhooks || [], null, 2)
       })
       .catch((error) => {
         document.getElementById('users').textContent = error.message
         document.getElementById('groups').textContent = error.message
+        document.getElementById('webhooks').textContent = error.message
       })
   </script>
 </body>

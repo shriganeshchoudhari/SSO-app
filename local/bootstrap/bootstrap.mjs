@@ -100,6 +100,14 @@ const outboundTarget = {
   deleteGroupOnLocalDelete: true,
 };
 
+const webhookTarget = {
+  name: "mock-webhook-target",
+  url: "http://mock-scim-target:8090/webhooks/openidentity",
+  signingSecret: "mock-webhook-secret",
+  subscribedEvents: ["login.*", "admin.*"],
+  enabled: true,
+};
+
 const scimSeedGroup = {
   displayName: "demo-group",
   externalId: "demo-group",
@@ -125,6 +133,7 @@ await ensureSamlProvider(realm.id, samlProvider);
 
 await ensureScimGroup(scimSeedGroup);
 const scimTarget = await ensureOutboundTarget(realm.id, outboundTarget);
+await ensureWebhookEndpoint(realm.id, webhookTarget);
 await syncOutboundUsers(realm.id, scimTarget.id);
 await syncOutboundGroups(realm.id, scimTarget.id);
 
@@ -309,6 +318,23 @@ async function ensureOutboundTarget(realmId, seed) {
   });
 }
 
+async function ensureWebhookEndpoint(realmId, seed) {
+  const endpoints = await api(`/admin/realms/${realmId}/webhooks`);
+  const existing = endpoints.find((endpoint) => endpoint.name === seed.name);
+  if (existing) {
+    await api(`/admin/realms/${realmId}/webhooks/${existing.id}`, {
+      method: "PUT",
+      body: seed,
+      parseJson: false,
+    });
+    return existing;
+  }
+  return api(`/admin/realms/${realmId}/webhooks`, {
+    method: "POST",
+    body: seed,
+  });
+}
+
 async function ensureScimGroup(seed) {
   const groups = await scim(
     `/scim/v2/realms/${encodeURIComponent(realmSeed.name)}/Groups?filter=${encodeURIComponent(
@@ -401,7 +427,7 @@ function printSummary() {
     `- Admin UI: http://localhost:3000`,
     `- Account UI: http://localhost:3001`,
     `- OIDC browser demo: http://localhost:8090/oidc-demo`,
-    `- SCIM inspection: http://localhost:8090/inspect`,
+    `- SCIM and webhook inspection: http://localhost:8090/inspect`,
     `- Dex discovery: http://localhost:5556/dex/.well-known/openid-configuration`,
     `- Local SAML IdP: http://localhost:8082`,
     "",

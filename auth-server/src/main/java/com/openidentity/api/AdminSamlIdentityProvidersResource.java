@@ -5,6 +5,7 @@ import com.openidentity.api.dto.SamlIdentityProviderDtos.SamlIdentityProviderRes
 import com.openidentity.api.dto.SamlIdentityProviderDtos.UpdateSamlIdentityProviderRequest;
 import com.openidentity.domain.RealmEntity;
 import com.openidentity.domain.SamlIdentityProviderEntity;
+import com.openidentity.service.FederationProviderLifecycleService;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
@@ -34,6 +35,7 @@ import java.util.stream.Collectors;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AdminSamlIdentityProvidersResource {
   @Inject EntityManager em;
+  @Inject FederationProviderLifecycleService federationProviderLifecycleService;
 
   @GET
   public List<SamlIdentityProviderResponse> list(@PathParam("realmId") UUID realmId,
@@ -124,8 +126,11 @@ public class AdminSamlIdentityProvidersResource {
   @DELETE
   @Path("/{providerId}")
   @Transactional
-  public Response delete(@PathParam("realmId") UUID realmId, @PathParam("providerId") UUID providerId) {
+  public Response delete(@PathParam("realmId") UUID realmId,
+                         @PathParam("providerId") UUID providerId,
+                         @QueryParam("linkedUserAction") String linkedUserAction) {
     SamlIdentityProviderEntity provider = requireProvider(realmId, providerId);
+    federationProviderLifecycleService.handleProviderDeletion("saml", providerId, linkedUserAction);
     em.remove(provider);
     return Response.noContent().build();
   }

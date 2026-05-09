@@ -10,6 +10,7 @@ import java.time.OffsetDateTime;
 @ApplicationScoped
 public class EventService {
   @Inject EntityManager em;
+  @Inject WebhookDeliveryService webhookDeliveryService;
 
   @Transactional
   public void loginEvent(RealmEntity realm, UserEntity user, ClientEntity client, String type, String ip, String details) {
@@ -22,6 +23,8 @@ public class EventService {
     e.setIpAddress(ip);
     e.setDetails(details);
     em.persist(e);
+    em.flush();
+    webhookDeliveryService.dispatchLoginEvent(e);
   }
 
   @Transactional
@@ -36,6 +39,7 @@ public class EventService {
     e.setIpAddress(ip);
     e.setDetails(details);
     em.persist(e);
+    em.flush();
+    webhookDeliveryService.dispatchAdminEvent(e);
   }
 }
-

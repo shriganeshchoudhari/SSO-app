@@ -5,6 +5,7 @@ import com.openidentity.api.dto.OidcIdentityProviderDtos.OidcIdentityProviderRes
 import com.openidentity.api.dto.OidcIdentityProviderDtos.UpdateOidcIdentityProviderRequest;
 import com.openidentity.domain.OidcIdentityProviderEntity;
 import com.openidentity.domain.RealmEntity;
+import com.openidentity.service.FederationProviderLifecycleService;
 import com.openidentity.service.SecretProtectionService;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -35,6 +36,7 @@ import java.util.stream.Collectors;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AdminOidcIdentityProvidersResource {
   @Inject EntityManager em;
+  @Inject FederationProviderLifecycleService federationProviderLifecycleService;
   @Inject SecretProtectionService secretProtectionService;
 
   @GET
@@ -139,8 +141,11 @@ public class AdminOidcIdentityProvidersResource {
   @DELETE
   @Path("/{providerId}")
   @Transactional
-  public Response delete(@PathParam("realmId") UUID realmId, @PathParam("providerId") UUID providerId) {
+  public Response delete(@PathParam("realmId") UUID realmId,
+                         @PathParam("providerId") UUID providerId,
+                         @QueryParam("linkedUserAction") String linkedUserAction) {
     OidcIdentityProviderEntity provider = requireProvider(realmId, providerId);
+    federationProviderLifecycleService.handleProviderDeletion("oidc", providerId, linkedUserAction);
     em.remove(provider);
     return Response.noContent().build();
   }

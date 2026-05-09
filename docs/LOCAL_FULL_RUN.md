@@ -30,7 +30,7 @@ docker compose run --rm bootstrap
 - Auth server readiness: [http://localhost:7070/q/health/ready](http://localhost:7070/q/health/ready)
 - Auth server metrics: [http://localhost:7070/q/metrics](http://localhost:7070/q/metrics)
 - OIDC browser demo: [http://localhost:8090/oidc-demo](http://localhost:8090/oidc-demo)
-- SCIM inspection: [http://localhost:8090/inspect](http://localhost:8090/inspect)
+- SCIM and webhook inspection: [http://localhost:8090/inspect](http://localhost:8090/inspect)
 - Dex discovery: [http://localhost:5556/dex/.well-known/openid-configuration](http://localhost:5556/dex/.well-known/openid-configuration)
 - Local SAML IdP shim: [http://localhost:8082](http://localhost:8082)
 - Local SAML session console: [http://localhost:8082/simplesaml/session](http://localhost:8082/simplesaml/session)
@@ -71,6 +71,7 @@ Paste the returned access token into the admin UI.
 - OIDC broker provider config for `dex`
 - SAML broker provider config for `simplesamlphp`
 - Outbound SCIM target config for `mock-scim-target`
+- Webhook endpoint config for `mock-webhook-target`
 - Seed SCIM group `demo-group`
 - Initial outbound SCIM user and group sync
 
@@ -114,6 +115,12 @@ Paste the returned access token into the admin UI.
 2. Confirm seeded local users and `demo-group` appear in the remote mock target state
 3. Update a local user profile through the account UI or admin UI
 4. Refresh the inspection page and confirm outbound sync reflects the updated state
+
+### Webhook delivery baseline
+1. Keep [http://localhost:8090/inspect](http://localhost:8090/inspect) open
+2. Sign in through hosted login or create/update a user from the admin API/UI
+3. Refresh the inspection page
+4. Confirm `Webhook Deliveries` shows signed `login.*` and `admin.*` events sent to the seeded `mock-webhook-target`
 
 ## Local Integration Boundaries
 - `openldap` is a real local LDAP server

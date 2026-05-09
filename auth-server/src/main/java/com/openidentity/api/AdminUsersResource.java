@@ -8,6 +8,7 @@ import com.openidentity.domain.RealmEntity;
 import com.openidentity.domain.RoleEntity;
 import com.openidentity.domain.CredentialEntity;
 import com.openidentity.domain.UserEntity;
+import com.openidentity.service.EventService;
 import com.openidentity.service.FederationPolicyService;
 import com.openidentity.service.ScimOutboundProvisioningService;
 import com.openidentity.service.ScimRoleMappingService;
@@ -38,6 +39,7 @@ public class AdminUsersResource {
   }
 
   @Inject EntityManager em;
+  @Inject EventService eventService;
   @Inject FederationPolicyService federationPolicyService;
   @Inject ScimRoleMappingService scimRoleMappingService;
   @Inject ScimOutboundProvisioningService scimOutboundProvisioningService;
@@ -104,6 +106,8 @@ public class AdminUsersResource {
     u.setCreatedAt(OffsetDateTime.now());
     em.persist(u);
     scimOutboundProvisioningService.syncUserToAutoTargets(u);
+    eventService.adminEvent(
+        realm, null, "create", "user", u.getId().toString(), null, "username=" + u.getUsername());
     return Response.created(URI.create(String.format("/admin/realms/%s/users/%s", realmId, u.getId())))
         .entity(new UserResponse(u.getId(), realmId, u.getUsername(), u.getEmail(), u.getEnabled(),
             u.getEmailVerified(), u.getFederationSource(), u.getFederationProviderId()))
@@ -127,6 +131,8 @@ public class AdminUsersResource {
     }
     if (req.enabled != null) u.setEnabled(req.enabled);
     scimOutboundProvisioningService.syncUserToAutoTargets(u);
+    eventService.adminEvent(
+        u.getRealm(), null, "update", "user", u.getId().toString(), null, "username=" + u.getUsername());
     return Response.noContent().build();
   }
 
@@ -153,6 +159,14 @@ public class AdminUsersResource {
       replacePassword(u, password);
     }
     federationPolicyService.detachToLocal(u);
+    eventService.adminEvent(
+        u.getRealm(),
+        null,
+        "detach_federation",
+        "user",
+        u.getId().toString(),
+        null,
+        "username=" + u.getUsername());
     return new UserResponse(u.getId(), u.getRealm().getId(), u.getUsername(), u.getEmail(), u.getEnabled(),
         u.getEmailVerified(), u.getFederationSource(), u.getFederationProviderId());
   }
@@ -170,6 +184,14 @@ public class AdminUsersResource {
     ur.setUser(userId);
     ur.setRole(roleId);
     em.persist(ur);
+    eventService.adminEvent(
+        u.getRealm(),
+        null,
+        "assign_role",
+        "user_role",
+        userId + ":" + roleId,
+        null,
+        "username=" + u.getUsername());
     return Response.noContent().build();
   }
 
@@ -178,10 +200,20 @@ public class AdminUsersResource {
   @Operation(summary = "Unassign role from user")
   @Transactional
   public Response unassignRole(@PathParam("realmId") UUID realmId, @PathParam("userId") UUID userId, @PathParam("roleId") UUID roleId) {
+    UserEntity u = em.find(UserEntity.class, userId);
+    if (u == null || !u.getRealm().getId().equals(realmId)) throw new NotFoundException();
     var ur = em.find(com.openidentity.domain.UserRoleEntity.class, new com.openidentity.domain.UserRoleId(userId, roleId));
     if (ur != null) {
       em.remove(ur);
     }
+    eventService.adminEvent(
+        u.getRealm(),
+        null,
+        "unassign_role",
+        "user_role",
+        userId + ":" + roleId,
+        null,
+        "username=" + u.getUsername());
     return Response.noContent().build();
   }
 
@@ -194,6 +226,8 @@ public class AdminUsersResource {
     if (u == null || !u.getRealm().getId().equals(realmId)) {
       throw new NotFoundException("User not found");
     }
+    eventService.adminEvent(
+        u.getRealm(), null, "delete", "user", u.getId().toString(), null, "username=" + u.getUsername());
     userLifecycleService.deleteUser(u);
     return Response.noContent().build();
   }

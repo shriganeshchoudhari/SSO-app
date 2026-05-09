@@ -4,6 +4,7 @@ F:\SSO-app\auth-server\src\main\java\com\openidentity\api\AdminEventsResource.ja
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\AdminLdapProvidersResource.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\AdminOidcIdentityProvidersResource.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\AdminOrganizationsResource.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\api\AdminRealmConfigResource.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\AdminRealmsResource.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\AdminRolesResource.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\AdminSamlIdentityProvidersResource.java
@@ -14,10 +15,12 @@ F:\SSO-app\auth-server\src\main\java\com\openidentity\api\AdminSessionsResource.
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\AdminSigningKeysResource.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\AdminUserCredentialsResource.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\AdminUsersResource.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\api\AdminWebhooksResource.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\dto\ClientDtos.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\dto\LdapProviderDtos.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\dto\OidcIdentityProviderDtos.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\dto\OrganizationDtos.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\api\dto\RealmConfigDtos.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\dto\RealmDtos.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\dto\RoleDtos.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\api\dto\SamlIdentityProviderDtos.java
@@ -72,6 +75,8 @@ F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\UserEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\UserRoleEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\UserRoleId.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\UserSessionEntity.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\WebhookDeliveryEntity.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\domain\WebhookEndpointEntity.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\filters\AdminAuthFilter.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\filters\TokenRateLimitFilter.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\health\ApplicationLivenessCheck.java
@@ -87,8 +92,10 @@ F:\SSO-app\auth-server\src\main\java\com\openidentity\service\ConsoleEmailServic
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\EmailService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\EventService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\FederationPolicyService.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\service\FederationProviderLifecycleService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\HttpOidcBrokerConnector.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\HttpScimOutboundConnector.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\service\HttpWebhookDispatcher.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\JndiLdapConnector.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\JwtKeyService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\LdapConnector.java
@@ -101,6 +108,7 @@ F:\SSO-app\auth-server\src\main\java\com\openidentity\service\OidcClientService.
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\OidcConsentService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\OidcGrantService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\RateLimitService.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\service\RealmConfigService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\SamlAssertionService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\SamlBrokerService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\SamlLogoutValidationService.java
@@ -118,3 +126,5 @@ F:\SSO-app\auth-server\src\main\java\com\openidentity\service\SessionService.jav
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\TokenIssuerService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\TracingService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\UserLifecycleService.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\service\WebhookDeliveryService.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\service\WebhookDispatcher.java

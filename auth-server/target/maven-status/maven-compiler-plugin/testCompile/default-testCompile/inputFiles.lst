@@ -1,6 +1,7 @@
 F:\SSO-app\auth-server\src\test\java\com\openidentity\AdminSecurityTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\AuthFlowTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\ClientRoleFlowTest.java
+F:\SSO-app\auth-server\src\test\java\com\openidentity\FederationProviderLifecycleTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\LdapFederationAuthTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\LdapFederationConfigTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\ObservabilityTest.java
@@ -11,6 +12,7 @@ F:\SSO-app\auth-server\src\test\java\com\openidentity\OpenApiTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\OrgAdminAuthTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\OrganizationsTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\PasswordResetAndEmailVerificationTest.java
+F:\SSO-app\auth-server\src\test\java\com\openidentity\RealmConfigExportImportTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\SamlAuthnRequestSigningTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\SamlBrokerFlowTest.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\SamlBrokerSignatureValidationTest.java
@@ -22,3 +24,5 @@ F:\SSO-app\auth-server\src\test\java\com\openidentity\SigningKeyRotationTest.jav
 F:\SSO-app\auth-server\src\test\java\com\openidentity\support\TestLdapConnector.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\support\TestOidcBrokerConnector.java
 F:\SSO-app\auth-server\src\test\java\com\openidentity\support\TestScimOutboundConnector.java
+F:\SSO-app\auth-server\src\test\java\com\openidentity\support\TestWebhookDispatcher.java
+F:\SSO-app\auth-server\src\test\java\com\openidentity\WebhookDeliveryTest.java

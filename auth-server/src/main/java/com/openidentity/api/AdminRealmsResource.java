@@ -4,6 +4,7 @@ import com.openidentity.api.dto.RealmDtos.CreateRealmRequest;
 import com.openidentity.api.dto.RealmDtos.RealmResponse;
 import com.openidentity.api.dto.RealmDtos.UpdateRealmRequest;
 import com.openidentity.domain.RealmEntity;
+import com.openidentity.service.EventService;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import jakarta.inject.Inject;
@@ -28,6 +29,7 @@ public class AdminRealmsResource {
   private static final String MFA_POLICY_REQUIRED = "required";
 
   @Inject EntityManager em;
+  @Inject EventService eventService;
 
   @GET
   @Operation(summary = "List realms")
@@ -69,6 +71,7 @@ public class AdminRealmsResource {
     r.setMfaRequired(isMfaRequired(mfaPolicy, req.mfaRequired));
     r.setCreatedAt(OffsetDateTime.now());
     em.persist(r);
+    eventService.adminEvent(r, null, "create", "realm", r.getId().toString(), null, "name=" + r.getName());
     return Response.created(URI.create("/admin/realms/" + r.getId())).entity(
         toResponse(r)
     ).build();
@@ -99,6 +102,7 @@ public class AdminRealmsResource {
       r.setMfaRequired(isMfaRequired(mfaPolicy, req.mfaRequired != null ? req.mfaRequired : r.getMfaRequired()));
     }
     em.merge(r);
+    eventService.adminEvent(r, null, "update", "realm", r.getId().toString(), null, "name=" + r.getName());
     return toResponse(r);
   }
 
@@ -111,6 +115,7 @@ public class AdminRealmsResource {
     if (r == null) {
       throw new NotFoundException("Realm not found");
     }
+    eventService.adminEvent(r, null, "delete", "realm", r.getId().toString(), null, "name=" + r.getName());
     em.remove(r);
     return Response.noContent().build();
   }

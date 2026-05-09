@@ -6,6 +6,7 @@ import com.openidentity.api.dto.LdapProviderDtos.UpdateLdapProviderRequest;
 import com.openidentity.domain.LdapProviderEntity;
 import com.openidentity.domain.RealmEntity;
 import com.openidentity.service.LdapFederationService;
+import com.openidentity.service.FederationProviderLifecycleService;
 import com.openidentity.service.SecretProtectionService;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -51,6 +52,7 @@ public class AdminLdapProvidersResource {
 
   @Inject EntityManager em;
   @Inject LdapFederationService ldapFederationService;
+  @Inject FederationProviderLifecycleService federationProviderLifecycleService;
   @Inject SecretProtectionService secretProtectionService;
 
   @GET
@@ -145,8 +147,11 @@ public class AdminLdapProvidersResource {
   @DELETE
   @Path("/{providerId}")
   @Transactional
-  public Response delete(@PathParam("realmId") UUID realmId, @PathParam("providerId") UUID providerId) {
+  public Response delete(@PathParam("realmId") UUID realmId,
+                         @PathParam("providerId") UUID providerId,
+                         @QueryParam("linkedUserAction") String linkedUserAction) {
     LdapProviderEntity provider = requireProvider(realmId, providerId);
+    federationProviderLifecycleService.handleProviderDeletion("ldap", providerId, linkedUserAction);
     em.remove(provider);
     return Response.noContent().build();
   }
