@@ -14,6 +14,7 @@ public class LdapProviderDtos {
     public String emailAttribute;
     public Boolean syncAttributesOnLogin;
     public Boolean disableMissingUsers;
+    public Boolean hardDeleteMissing;
     public Boolean enabled;
   }
 
@@ -28,6 +29,7 @@ public class LdapProviderDtos {
     public String emailAttribute;
     public Boolean syncAttributesOnLogin;
     public Boolean disableMissingUsers;
+    public Boolean hardDeleteMissing;
     public Boolean enabled;
   }
 
@@ -43,6 +45,7 @@ public class LdapProviderDtos {
     public String emailAttribute;
     public Boolean syncAttributesOnLogin;
     public Boolean disableMissingUsers;
+    public Boolean hardDeleteMissing;
     public Boolean enabled;
     public Boolean bindCredentialConfigured;
 
@@ -60,6 +63,7 @@ public class LdapProviderDtos {
         String emailAttribute,
         Boolean syncAttributesOnLogin,
         Boolean disableMissingUsers,
+        Boolean hardDeleteMissing,
         Boolean enabled,
         Boolean bindCredentialConfigured) {
       this.id = id;
@@ -73,6 +77,7 @@ public class LdapProviderDtos {
       this.emailAttribute = emailAttribute;
       this.syncAttributesOnLogin = syncAttributesOnLogin;
       this.disableMissingUsers = disableMissingUsers;
+      this.hardDeleteMissing = hardDeleteMissing;
       this.enabled = enabled;
       this.bindCredentialConfigured = bindCredentialConfigured;
     }

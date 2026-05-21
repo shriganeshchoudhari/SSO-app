@@ -24,6 +24,9 @@ public class TestOidcBrokerConnector implements OidcBrokerConnector {
     if ("mock-google-code-updated".equals(authorizationCode)) {
       return new BrokerProfile("google-subject-123", "brokered-user", "brokered-updated@example.com", Boolean.TRUE);
     }
+    if ("mock-google-code-uninvited".equals(authorizationCode)) {
+      return new BrokerProfile("google-subject-uninvited", "uninvited-user", "uninvited-user@example.com", Boolean.TRUE);
+    }
     throw new IllegalStateException("Unknown broker authorization code");
   }
 }

@@ -1,2 +1,3 @@
-com\openidentity\service\JndiLdapConnector$1.class
+com\openidentity\service\OrganizationPolicyService.class
 com\openidentity\service\FederationProviderLifecycleService.class
+com\openidentity\service\JndiLdapConnector$1.class

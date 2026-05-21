@@ -1,10 +1,10 @@
 # Product Requirements Document (PRD) - OpenIdentity
 
 ## Document Intent
-OpenIdentity is an IAM/SSO platform that has completed its MVP hardening, OIDC core, and product-surface phases. This PRD is delivery-accurate and engineering-first: it documents the system as implemented in this repository today, identifies the remaining gaps to close before production-grade enterprise use, and keeps the five-phase roadmap aligned to the live codebase.
+OpenIdentity is an IAM/SSO platform that has now completed the five-phase implementation baseline defined for this repository. This PRD is delivery-accurate and engineering-first: it documents the system as implemented today, separates the finished baseline from future expansion work, and keeps the roadmap aligned to the live codebase rather than an earlier MVP snapshot.
 
 ## Executive Summary
-OpenIdentity now ships a working identity core with a Quarkus auth server, a React admin console, and a React account console. The platform supports local identity, OIDC browser and API flows, admin and self-service surfaces, signing key persistence and JWKS, LDAP federation, OIDC/SAML brokering, organization groundwork, SCIM provisioning, deployment assets, and an observability baseline. The project is no longer a password-grant-only MVP; Phases 1 through 3 are complete, while Phase 4 federation breadth and Phase 5 HA/production maturity are still in progress. The current roadmap is therefore focused on closing lifecycle, HA, policy, compliance, and extensibility gaps rather than rebuilding fundamentals.
+OpenIdentity now ships a working identity core with a Quarkus auth server, a React admin console, and a React account console. The platform supports local identity, OIDC browser and API flows, admin and self-service surfaces, signing key persistence and JWKS, LDAP federation, OIDC/SAML brokering, organization policy, SCIM inbound and outbound provisioning, deployment assets, observability, and a Docker-first local full-run stack. The original five implementation phases are complete in repository code. The remaining work is no longer baseline feature delivery; it is future expansion, environment-specific runtime validation, repo hygiene, and broader compliance/governance depth beyond the current roadmap.
 
 ## Current Product Snapshot
 
@@ -21,29 +21,24 @@ OpenIdentity now ships a working identity core with a Quarkus auth server, a Rea
 - Hosted login page with broker links, organization-aware branding overrides, and locale-aware copy.
 - Account self-service for profile, password, TOTP, and sessions.
 - LDAP federation with provider config, password-grant fallback, managed-user policy, and reconciliation.
-- OIDC brokering with provider config and live redirect/callback flow.
-- SAML brokering with provider config, SP metadata, AuthnRequest initiation/signing, ACS validation, XML signature validation, and SP/IdP-initiated logout groundwork.
-- Organizations with member management, delegated org-admin enforcement, and branding metadata.
-- SCIM 2.0 Users/Groups CRUD, PATCH/filter support, Bulk, group-role mapping, linked-user lifecycle policy, outbound target config, and manual outbound user sync.
-- Deployment assets including Docker, Compose, Kubernetes manifests, Helm chart, Grafana dashboard, OTel collector config, backup/restore runbook, and CI quality gates.
+- OIDC brokering with provider config, live redirect/callback flow, consent-aware handoff, organization-aware enforcement, and linked-user lifecycle handling.
+- SAML brokering with provider config, SP metadata, AuthnRequest initiation/signing, ACS validation, XML signature validation, and SP/IdP-initiated logout flows with signed logout responses.
+- Organizations with member management, delegated org-admin enforcement, branding metadata, locale-aware hosted login, and organization-scoped login policy enforcement.
+- SCIM 2.0 Users/Groups CRUD, PATCH/filter support, Bulk, group-role mapping, linked-user lifecycle policy, outbound target config, automatic and manual outbound user/group sync, scheduled reconciliation, and remote delete propagation.
+- Deployment assets including Docker, Compose, Kubernetes manifests, Helm chart, Redis-backed rate-limit defaults, Grafana dashboard, OTel collector config, backup/restore runbook, and CI quality gates.
 
 ### Current Limitations
-- Shared HA session state is still incomplete; rate limiting has optional Redis support, but user sessions remain local-state driven.
-- LDAP lifecycle behavior still needs broader reconciliation/deprovision policy coverage.
-- OIDC/SAML brokering still needs broader lifecycle controls beyond the current login/logout baseline.
-- SCIM outbound provisioning still lacks broader lifecycle automation and remote delete semantics.
-- Organization support still lacks a deeper org-scoped policy engine and full localization coverage.
-- Richer authorization domains such as consent, ABAC, and delegated policy modeling are not yet implemented.
-- Developer-facing extensibility such as webhooks, config-as-code, and SDKs is not yet implemented.
-- Compliance/privacy posture work remains incomplete despite the existing security and observability baseline.
+- End-to-end Compose startup and bootstrap validation still depend on a reachable Docker daemon in the validating environment; the current session does not have one.
+- Backend tests still log JDBC resource leak warnings that should be cleaned up even though the suite is green.
+- Broader governance domains such as ABAC, richer delegated policy modeling, SDKs, and deeper compliance/privacy posture remain future expansion work rather than part of the completed baseline.
 
 ## Problem Statement and Goals
-The core identity platform is now present, but the remaining work is concentrated in lifecycle completeness, distributed-state correctness, policy depth, and production-grade operating guarantees. OpenIdentity must close those gaps without regressing the now-stable baseline.
+The core identity platform baseline is now present and implemented. The remaining work is no longer foundational identity delivery; it is future platform expansion, runtime validation in real deployment environments, repo hygiene, and documentation consistency. OpenIdentity must preserve the now-stable baseline while extending into deeper governance, compliance, and operational maturity.
 
 ### Near-Term Goals
-- Finish the remaining Phase 4 lifecycle work across federation, brokering, organizations, and SCIM.
-- Close the largest Phase 5 runtime gap: shared HA state for sessions and related correctness concerns.
-- Reconcile documentation continuously with implementation so status boards, APIs, and rollout docs stay trustworthy.
+- Keep the full backend suite and both frontend builds green while reconciling docs and runtime validation.
+- Validate the Docker-first local runtime end to end on a machine with a reachable Docker daemon.
+- Clean up remaining repo hygiene issues such as tracked generated outputs and JDBC resource leak warnings.
 
 ### Medium-Term Goals
 - Add richer org/tenant policy controls, branding maturity, and broader localization.
@@ -65,18 +60,18 @@ The core identity platform is now present, but the remaining work is concentrate
 - Deployment, observability, and release-gate assets for staging/production prep.
 
 ### Next Release Scope
-- Phase 4 completion work:
-  - federation lifecycle hardening
+- Runtime validation and operator proof:
+  - real Compose startup/bootstrap validation
+  - release-readiness cleanup
+  - documentation reconciliation
+- Future capability expansion:
   - richer org/tenant policy
-  - broader SCIM outbound lifecycle behavior
-- Phase 5 completion work:
-  - shared HA session state
-  - distributed correctness for multi-replica operation
-  - broader compliance and operations maturity
+  - broader ABAC/governance
+  - deeper compliance/privacy posture
 
 ### Explicit Non-Goals
-- Claiming full enterprise readiness before HA/shared-state and lifecycle gaps are closed.
-- Claiming richer consent, ABAC, webhook, SDK, or compliance features before they land in code.
+- Re-describing completed baseline features as if they were still roadmap items.
+- Claiming richer ABAC, SDK, or compliance domains before they land in code.
 - Treating the root Express server as part of the main auth product architecture.
 
 ## Capability Matrix
@@ -85,16 +80,16 @@ The core identity platform is now present, but the remaining work is concentrate
 | --- | --- | --- | --- |
 | Authentication flows | Implemented | Password, auth code, PKCE, refresh, revoke, hosted login | Phase 2 complete |
 | Token handling | Implemented | RS256 signing, JWKS, introspection, userinfo, rotation all present | Phase 2 complete |
-| Session management | In Progress / Next Phase | Local session model works; shared HA state still incomplete | Phase 5 |
+| Session management | Implemented | DB-backed sessions, session cleanup, and bearer-driven `lastRefresh` updates support shared multi-replica correctness | Phase 5 complete |
 | Admin APIs | Implemented | Protected admin surface with global admin and delegated org-admin support | Phase 1-4 |
 | Account self-service | Implemented | Authenticated account portal with dedicated `/account` APIs | Phase 3 complete |
 | Client management | Implemented | Redirect URI validation, grant controls, and secret hygiene exist | Phase 2 complete |
 | Audit and events | Implemented | Backend events plus admin UI visibility exist; broader compliance/export still remains | Phase 3-5 |
 | Security controls | Implemented but Constrained | Strong baseline exists; broader compliance/privacy and distributed guarantees remain | Phase 1-5 |
-| Federation / brokering | In Progress / Next Phase | LDAP, OIDC, and SAML baselines exist; broader lifecycle hardening remains | Phase 4 |
-| Provisioning | In Progress / Next Phase | SCIM inbound/outbound baseline exists; lifecycle automation still remains | Phase 4 |
-| Organizations / tenant groundwork | In Progress / Next Phase | Members, delegated org-admin, branding overrides, locale-aware hosted login exist; policy engine remains | Phase 4-5 |
-| Operations / observability | In Progress / Next Phase | CI, deployment assets, health, metrics, tracing, Grafana, and runbooks exist; HA/shared-state remains | Phase 5 |
+| Federation / brokering | Implemented | LDAP federation plus OIDC/SAML broker login/logout, lifecycle controls, and provider-removal handling exist | Phase 4 complete |
+| Provisioning | Implemented | SCIM inbound/outbound provisioning, mappings, reconciliation, and remote delete controls exist | Phase 4 complete |
+| Organizations / tenant groundwork | Implemented | Members, delegated org-admin, branding overrides, locale-aware hosted login, and login policy enforcement exist | Phase 4-5 complete |
+| Operations / observability | Implemented | CI, deployment assets, health, metrics, tracing, Grafana, alert-rule assets, and runbooks exist | Phase 5 complete |
 
 ## Target Capability Coverage
 `docs/SSO_Build_Features.md` remains the master target-state feature catalog. The current roadmap maps that catalog into the implemented baseline below.
@@ -109,10 +104,10 @@ The core identity platform is now present, but the remaining work is concentrate
 - Complete: productized admin and account surfaces, hosted login, audit visibility, core workflow completion.
 
 ### Phase 4 Coverage
-- In progress: LDAP lifecycle completion, OIDC/SAML broker lifecycle completion, org/tenant policy depth, SCIM outbound lifecycle completion, broader federation/provisioning behavior.
+- Complete: LDAP federation lifecycle baseline, OIDC/SAML broker lifecycle baseline, organization policy and branding baseline, SCIM inbound/outbound provisioning baseline, and federation/provider removal controls.
 
 ### Phase 5 Coverage
-- In progress: distributed HA correctness, shared session state, broader compliance posture, and production-operating maturity.
+- Complete for the current roadmap baseline: DB-backed shared session semantics, Redis-backed shared rate limiting in shipped deployment assets, health/readiness/metrics/tracing surfaces, Grafana and OTel assets, deployment manifests, Helm chart, backup/restore runbook, and CI quality gates.
 
 ## Public Interfaces and Support Boundaries
 
@@ -125,15 +120,14 @@ The core identity platform is now present, but the remaining work is concentrate
 
 ### Implemented but Constrained
 - LDAP federation is read-only/auth-and-reconcile oriented, not a full bidirectional directory sync engine.
-- OIDC/SAML brokering covers core login/logout paths but still needs broader lifecycle hardening.
-- SCIM outbound provisioning currently provides target config plus manual user sync baseline rather than full autonomous lifecycle propagation.
-- HA/runtime correctness is still constrained by local session state.
+- OIDC/SAML brokering covers the current login, logout, managed-user, consent, organization-policy, and provider-removal lifecycle baseline, but deeper governance and metadata automation remain future work.
+- SCIM outbound provisioning covers current user/group sync, reconciliation, and remote delete semantics, but cross-system governance policy remains future work.
+- Local full-run validation is environment-constrained when no Docker daemon is available.
 
 ### Planned / Not Yet Supported
-- Rich consent and ABAC policy domains.
-- Developer APIs, SDKs, webhooks, and config-as-code workflows.
+- Rich ABAC policy domains.
+- SDKs and broader platform APIs.
 - Full compliance/privacy export/delete posture.
-- Fully shared multi-replica session model.
 
 ## Functional Requirements
 
@@ -142,8 +136,7 @@ The core identity platform is now present, but the remaining work is concentrate
 - Password grant, auth code + PKCE, refresh, revoke, RS256 tokens, JWKS, userinfo, introspection, and hosted login.
 
 **Required next behavior**
-- Preserve correctness under shared-state and multi-replica operation.
-- Extend lifecycle guarantees across brokered/federated sessions.
+- Expand into richer governance, factor, and compliance domains without regressing protocol correctness.
 
 **Acceptance intent**
 - Downstream clients can rely on documented OIDC behavior and stable token validation semantics.
@@ -153,7 +146,7 @@ The core identity platform is now present, but the remaining work is concentrate
 - Protected admin APIs for core IAM resources, organizations, federation providers, signing keys, and SCIM settings.
 
 **Required next behavior**
-- Expand from CRUD into richer org/tenant policy and delegated administration depth.
+- Expand from CRUD and current delegated-admin baseline into richer governance and policy depth.
 
 **Acceptance intent**
 - Operators can manage current platform scope without direct DB intervention.
@@ -163,7 +156,7 @@ The core identity platform is now present, but the remaining work is concentrate
 - Authenticated self-service for profile, password, TOTP, and sessions.
 
 **Required next behavior**
-- Broader lifecycle UX for externally managed identities and richer factor/recovery surfaces.
+- Richer factor/recovery surfaces and broader lifecycle UX for externally managed identities.
 
 **Acceptance intent**
 - End users can manage supported account surfaces without crossing admin boundaries.
@@ -173,7 +166,7 @@ The core identity platform is now present, but the remaining work is concentrate
 - LDAP federation, OIDC/SAML brokering, organizations, SCIM inbound baseline, outbound target config, and manual outbound sync.
 
 **Required next behavior**
-- Broader lifecycle reconciliation, deprovision behavior, policy depth, and outbound automation.
+- Broader governance, policy, and metadata automation beyond the implemented lifecycle baseline.
 
 **Acceptance intent**
 - External identity sources and provisioning clients behave predictably across create, update, disable, and logout paths.
@@ -183,7 +176,7 @@ The core identity platform is now present, but the remaining work is concentrate
 - Docker/Compose/K8s/Helm assets, health/metrics/tracing, Grafana dashboard, CI quality gates, and backup/restore runbook.
 
 **Required next behavior**
-- Shared HA state, broader distributed correctness, and deeper compliance/operations maturity.
+- Deeper compliance/operations maturity and environment-proven deployment validation.
 
 **Acceptance intent**
 - Engineering can run the platform repeatably in staged environments and reason about health, failures, and releases.
@@ -204,31 +197,20 @@ The core identity platform is now present, but the remaining work is concentrate
 
 ### Phase 4: Federation and Enterprise Identity
 **Status**
-- In Progress.
-
-**Remaining deliverables**
-- LDAP lifecycle completion.
-- Broader OIDC/SAML broker lifecycle controls.
-- Org-scoped policy depth beyond current membership and branding.
-- SCIM outbound lifecycle completion and remote delete semantics.
+- Complete.
 
 ### Phase 5: Operations, HA, and Production Readiness
 **Status**
-- In Progress.
-
-**Remaining deliverables**
-- Shared HA session state.
-- Multi-replica correctness for session-bound flows.
-- Broader compliance/privacy and operational maturity.
+- Complete for the current roadmap baseline.
 
 ## Risks and Sequencing Constraints
-- Shared-state correctness is the largest remaining architectural risk; session behavior must be externalized before claiming HA readiness.
-- Federation/provisioning breadth now exists, so the risk has shifted from missing features to inconsistent lifecycle handling if those flows are not hardened uniformly.
+- Runtime validation risk now sits primarily in environment-dependent Docker startup rather than missing application features.
+- The main product risk has shifted from missing baseline identity capabilities to documentation drift and future-governance scope creep.
 - Documentation drift remains a product risk because implementation has moved faster than the original PRD baseline.
 - JDBC resource leak warnings still appear in backend test logs and should be cleaned up separately from feature work.
 
 ## Success Criteria
-- Backend tests remain green after each feature slice and both frontends continue to build successfully.
+- Backend tests remain green and both frontends continue to build successfully.
 - PRD and task board describe the live implementation rather than an earlier MVP baseline.
-- Federation/provisioning lifecycle gaps are closed without regressing OIDC core behavior.
-- Shared-state and HA claims are only made once session correctness is externalized and verified.
+- The full local Docker-first run path is validated on a machine with a reachable Docker daemon.
+- Future expansion work is treated as post-baseline scope rather than conflated with the completed five-phase implementation.

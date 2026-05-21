@@ -27,6 +27,7 @@ public class OidcBrokerService {
   @Inject OidcBrokerConnector oidcBrokerConnector;
   @Inject OidcConsentService oidcConsentService;
   @Inject FederationPolicyService federationPolicyService;
+  @Inject OrganizationPolicyService organizationPolicyService;
 
   public record BrokerCallbackResult(URI clientRedirect, UserEntity user) {}
 
@@ -40,6 +41,7 @@ public class OidcBrokerService {
       String originalState,
       String codeChallenge,
       String codeChallengeMethod,
+      String organizationHint,
       URI callbackUri) {
     if (provider.getAuthorizationUrl() == null || provider.getAuthorizationUrl().isBlank()) {
       throw oidcError("server_error", Response.Status.BAD_REQUEST);
@@ -57,6 +59,7 @@ public class OidcBrokerService {
     entity.setScope(scope);
     entity.setCodeChallenge(codeChallenge);
     entity.setCodeChallengeMethod(codeChallengeMethod);
+    entity.setOrganizationHint(organizationHint);
     entity.setCreatedAt(OffsetDateTime.now());
     entity.setExpiresAt(SecurityTokenService.expiresIn(Duration.ofMinutes(10)));
     em.persist(entity);
@@ -87,7 +90,25 @@ public class OidcBrokerService {
         authorizationCode,
         providerClientSecret);
 
-    UserEntity user = findOrProvisionUser(realm, provider, profile);
+    UserEntity existingUser = findMatchingUser(realm, provider, profile);
+    try {
+      organizationPolicyService.enforceBrokerLogin(
+          realm, loginState.getOrganizationHint(), existingUser, profile.email());
+    } catch (WebApplicationException e) {
+      if ("organization_access_denied".equals(e.getMessage())) {
+        return new BrokerCallbackResult(
+            redirectWithClientParams(
+                loginState.getRedirectUri(),
+                "error",
+                "access_denied",
+                "state",
+                loginState.getOriginalState()),
+            existingUser);
+      }
+      throw e;
+    }
+
+    UserEntity user = materializeUser(realm, provider, profile, existingUser);
     URI nextLocation =
         oidcConsentService
             .completeAuthorizationOrBeginConsent(
@@ -99,7 +120,7 @@ public class OidcBrokerService {
                 loginState.getOriginalState(),
                 loginState.getCodeChallenge(),
                 loginState.getCodeChallengeMethod(),
-                null,
+                loginState.getOrganizationHint(),
                 "oidc_broker",
                 provider.getAlias())
             .redirectUri();
@@ -140,7 +161,7 @@ public class OidcBrokerService {
     return entity;
   }
 
-  private UserEntity findOrProvisionUser(
+  private UserEntity findMatchingUser(
       RealmEntity realm,
       OidcIdentityProviderEntity provider,
       OidcBrokerConnector.BrokerProfile profile) {
@@ -176,7 +197,14 @@ public class OidcBrokerService {
           .findFirst()
           .orElse(null);
     }
+    return user;
+  }
 
+  private UserEntity materializeUser(
+      RealmEntity realm,
+      OidcIdentityProviderEntity provider,
+      OidcBrokerConnector.BrokerProfile profile,
+      UserEntity user) {
     if (user == null) {
       user = new UserEntity();
       user.setId(UUID.randomUUID());

@@ -87,7 +87,8 @@ public class AdminLdapProvidersResource {
     provider.setId(UUID.randomUUID());
     provider.setRealm(realm);
     apply(provider, req.name, req.url, req.bindDn, req.bindCredential, req.userSearchBase, req.userSearchFilter,
-        req.usernameAttribute, req.emailAttribute, req.syncAttributesOnLogin, req.disableMissingUsers, req.enabled);
+        req.usernameAttribute, req.emailAttribute, req.syncAttributesOnLogin, req.disableMissingUsers,
+        req.hardDeleteMissing, req.enabled);
     provider.setCreatedAt(OffsetDateTime.now());
     em.persist(provider);
     return Response.created(URI.create(String.format("/admin/realms/%s/federation/ldap/%s", realmId, provider.getId())))
@@ -138,6 +139,9 @@ public class AdminLdapProvidersResource {
     if (req.disableMissingUsers != null) {
       provider.setDisableMissingUsers(req.disableMissingUsers);
     }
+    if (req.hardDeleteMissing != null) {
+      provider.setHardDeleteMissing(req.hardDeleteMissing);
+    }
     if (req.enabled != null) {
       provider.setEnabled(req.enabled);
     }
@@ -184,6 +188,7 @@ public class AdminLdapProvidersResource {
                      String emailAttribute,
                      Boolean syncAttributesOnLogin,
                      Boolean disableMissingUsers,
+                     Boolean hardDeleteMissing,
                      Boolean enabled) {
     provider.setName(name);
     provider.setUrl(url);
@@ -195,6 +200,7 @@ public class AdminLdapProvidersResource {
     provider.setEmailAttribute(emailAttribute != null && !emailAttribute.isBlank() ? emailAttribute : "mail");
     provider.setSyncAttributesOnLogin(syncAttributesOnLogin != null ? syncAttributesOnLogin : Boolean.TRUE);
     provider.setDisableMissingUsers(disableMissingUsers != null ? disableMissingUsers : Boolean.FALSE);
+    provider.setHardDeleteMissing(hardDeleteMissing != null ? hardDeleteMissing : Boolean.FALSE);
     provider.setEnabled(enabled != null ? enabled : Boolean.TRUE);
   }
 
@@ -219,6 +225,7 @@ public class AdminLdapProvidersResource {
         provider.getEmailAttribute(),
         provider.getSyncAttributesOnLogin(),
         provider.getDisableMissingUsers(),
+        provider.getHardDeleteMissing(),
         provider.getEnabled(),
         provider.getBindCredential() != null && !provider.getBindCredential().isBlank());
   }

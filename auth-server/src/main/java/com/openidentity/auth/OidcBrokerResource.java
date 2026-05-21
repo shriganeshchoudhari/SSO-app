@@ -40,6 +40,7 @@ public class OidcBrokerResource {
       @QueryParam("state") String state,
       @QueryParam("code_challenge") String codeChallenge,
       @QueryParam("code_challenge_method") String codeChallengeMethod,
+      @QueryParam("organization") String organization,
       @Context UriInfo uriInfo) {
     try {
       RealmEntity realm = requireRealm(realmName);
@@ -55,6 +56,7 @@ public class OidcBrokerResource {
           state,
           codeChallenge,
           codeChallengeMethod,
+          organization,
           callbackUri);
       observabilityService.recordBrokerFlow("oidc", "login", "success");
       return Response.seeOther(loginRedirect).build();

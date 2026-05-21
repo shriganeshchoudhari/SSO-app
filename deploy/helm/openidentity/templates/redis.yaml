@@ -1,0 +1,66 @@
+{{- if .Values.redis.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "openidentity.fullname" . }}-redis
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openidentity.labels" . | nindent 4 }}
+    component: redis
+spec:
+  serviceName: {{ include "openidentity.fullname" . }}-redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "openidentity.fullname" . }}-redis
+  template:
+    metadata:
+      labels:
+        app: {{ include "openidentity.fullname" . }}-redis
+    spec:
+      containers:
+        - name: redis
+          image: {{ .Values.redis.image }}
+          command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+          ports:
+            - containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.redis.storage }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "openidentity.fullname" . }}-redis
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openidentity.labels" . | nindent 4 }}
+    component: redis
+spec:
+  clusterIP: None
+  selector:
+    app: {{ include "openidentity.fullname" . }}-redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+{{- end }}

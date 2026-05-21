@@ -261,6 +261,59 @@ public class LdapFederationAuthTest {
   }
 
   @Test
+  void manual_reconcile_can_hard_delete_missing_linked_users() {
+    Response realmResp = adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.of("name", "ldap-hard-delete", "displayName", "LDAP Hard Delete"))
+        .when().post("/admin/realms")
+        .then().statusCode(anyOf(is(200), is(201)))
+        .extract().response();
+    String realmId = realmResp.jsonPath().getString("id");
+
+    Response providerResp = adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.of(
+            "name", "corp-ldap",
+            "url", "ldap://mock-directory",
+            "bindDn", "cn=svc-openidentity,dc=example,dc=com",
+            "bindCredential", "BindSecret123!",
+            "disableMissingUsers", true,
+            "hardDeleteMissing", true,
+            "enabled", true))
+        .when().post("/admin/realms/" + realmId + "/federation/ldap")
+        .then().statusCode(anyOf(is(200), is(201)))
+        .body("hardDeleteMissing", equalTo(true))
+        .extract().response();
+    String providerId = providerResp.jsonPath().getString("id");
+
+    given()
+        .contentType("application/x-www-form-urlencoded")
+        .formParam("grant_type", "password")
+        .formParam("client_id", "web-app")
+        .formParam("username", "ldapuser")
+        .formParam("password", "DirectorySecret123!")
+        .when().post("/auth/realms/ldap-hard-delete/protocol/openid-connect/token")
+        .then().statusCode(200);
+
+    adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.of("userSearchBase", "missing-users"))
+        .when().put("/admin/realms/" + realmId + "/federation/ldap/" + providerId)
+        .then().statusCode(anyOf(is(200), is(204)));
+
+    adminRequest()
+        .when().post("/admin/realms/" + realmId + "/federation/ldap/" + providerId + "/reconcile")
+        .then().statusCode(200)
+        .body("checkedUsers", equalTo(1))
+        .body("disabledUsers", equalTo(1));
+
+    adminRequest()
+        .when().get("/admin/realms/" + realmId + "/users")
+        .then().statusCode(200)
+        .body("$", org.hamcrest.Matchers.empty());
+  }
+
+  @Test
   void ldap_managed_users_reject_local_password_and_email_mutations() {
     Response realmResp = adminRequest()
         .contentType(ContentType.JSON)

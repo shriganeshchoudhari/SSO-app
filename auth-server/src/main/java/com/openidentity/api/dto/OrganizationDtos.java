@@ -1,6 +1,8 @@
 package com.openidentity.api.dto;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 public class OrganizationDtos {
@@ -13,6 +15,8 @@ public class OrganizationDtos {
     public String accentColor;
     public String locale;
     public Boolean enabled;
+    public Boolean requireMembershipForLogin;
+    public List<String> allowedEmailDomains = new ArrayList<>();
   }
 
   public static class UpdateOrganizationRequest {
@@ -22,6 +26,8 @@ public class OrganizationDtos {
     public String accentColor;
     public String locale;
     public Boolean enabled;
+    public Boolean requireMembershipForLogin;
+    public List<String> allowedEmailDomains;
   }
 
   public static class OrganizationResponse {
@@ -34,12 +40,15 @@ public class OrganizationDtos {
     public String accentColor;
     public String locale;
     public Boolean enabled;
+    public Boolean requireMembershipForLogin;
+    public List<String> allowedEmailDomains = new ArrayList<>();
     public OffsetDateTime createdAt;
 
     public OrganizationResponse() {}
     public OrganizationResponse(UUID id, UUID realmId, String name, String displayName,
         String logoText, String primaryColor, String accentColor, String locale,
-        Boolean enabled, OffsetDateTime createdAt) {
+        Boolean enabled, Boolean requireMembershipForLogin, List<String> allowedEmailDomains,
+        OffsetDateTime createdAt) {
       this.id = id;
       this.realmId = realmId;
       this.name = name;
@@ -49,6 +58,10 @@ public class OrganizationDtos {
       this.accentColor = accentColor;
       this.locale = locale;
       this.enabled = enabled;
+      this.requireMembershipForLogin = requireMembershipForLogin;
+      if (allowedEmailDomains != null) {
+        this.allowedEmailDomains = new ArrayList<>(allowedEmailDomains);
+      }
       this.createdAt = createdAt;
     }
   }

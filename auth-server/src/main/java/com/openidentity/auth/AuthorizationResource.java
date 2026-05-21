@@ -10,6 +10,7 @@ import com.openidentity.domain.UserEntity;
 import com.openidentity.service.MfaTotpService;
 import com.openidentity.service.OidcClientService;
 import com.openidentity.service.OidcConsentService;
+import com.openidentity.service.OrganizationPolicyService;
 import com.openidentity.service.SecretProtectionService;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -40,6 +41,7 @@ public class AuthorizationResource {
   @Inject EntityManager em;
   @Inject OidcClientService oidcClientService;
   @Inject OidcConsentService oidcConsentService;
+  @Inject OrganizationPolicyService organizationPolicyService;
   @Inject SecretProtectionService secretProtectionService;
   @Inject MfaTotpService mfaTotpService;
 
@@ -61,6 +63,7 @@ public class AuthorizationResource {
       String totpRequired,
       String invalidCredentials,
       String mfaEnrollmentRequired,
+      String organizationAccessDenied,
       String loginFailed,
       String continueWith,
       String clientLabel) {}
@@ -110,6 +113,7 @@ public class AuthorizationResource {
         scope, state, codeChallenge, codeChallengeMethod);
     try {
       UserEntity user = authenticateUser(realm, username, password, totp);
+      organizationPolicyService.enforceLocalLogin(realm, branding.organizationHint(), user);
       URI nextLocation =
           oidcConsentService
               .completeAuthorizationOrBeginConsent(
@@ -127,12 +131,18 @@ public class AuthorizationResource {
               .redirectUri();
       return Response.seeOther(nextLocation).build();
     } catch (WebApplicationException e) {
-      String errorCode = "mfa_enrollment_required".equals(e.getMessage())
-          ? "mfa_enrollment_required"
-          : "invalid_credentials";
+      String errorCode = switch (e.getMessage() == null ? "" : e.getMessage()) {
+        case "mfa_enrollment_required" -> "mfa_enrollment_required";
+        case "organization_access_denied" -> "organization_access_denied";
+        default -> "invalid_credentials";
+      };
       String html = buildLoginPage(realm, branding, responseType, clientId, redirectUri,
           scope, state, codeChallenge, codeChallengeMethod, brokerOptions, errorCode);
-      return Response.status(Response.Status.UNAUTHORIZED).entity(html).type(MediaType.TEXT_HTML).build();
+      Response.Status status =
+          "organization_access_denied".equals(errorCode)
+              ? Response.Status.FORBIDDEN
+              : Response.Status.UNAUTHORIZED;
+      return Response.status(status).entity(html).type(MediaType.TEXT_HTML).build();
     } catch (Exception e) {
       String html = buildLoginPage(realm, branding, responseType, clientId, redirectUri,
           scope, state, codeChallenge, codeChallengeMethod, brokerOptions, "login_failed");
@@ -186,6 +196,7 @@ public class AuthorizationResource {
     LoginText text = loginText(branding.locale());
     String errorMessage = switch (error == null ? "" : error) {
       case "mfa_enrollment_required" -> text.mfaEnrollmentRequired();
+      case "organization_access_denied" -> text.organizationAccessDenied();
       case "login_failed" -> text.loginFailed();
       case "invalid_credentials" -> text.invalidCredentials();
       default -> null;
@@ -762,7 +773,7 @@ public class AuthorizationResource {
     String realmLabel = realm.getDisplayName() != null && !realm.getDisplayName().isBlank()
         ? realm.getDisplayName()
         : realm.getName();
-    OrganizationEntity org = resolveOrganization(realm, organizationHint);
+    OrganizationEntity org = organizationPolicyService.requireActiveOrganization(realm, organizationHint);
     if (org == null) {
       return new LoginBranding(realmLabel, realmLabel, initials(realmLabel), DEFAULT_PRIMARY,
           DEFAULT_ACCENT, "en", null);
@@ -780,21 +791,6 @@ public class AuthorizationResource {
         org.getName());
   }
 
-  private OrganizationEntity resolveOrganization(RealmEntity realm, String organizationHint) {
-    if (organizationHint == null || organizationHint.isBlank()) {
-      return null;
-    }
-    return em.createQuery(
-            "select o from OrganizationEntity o where o.realm.id = :rid and o.enabled = true and o.name = :name",
-            OrganizationEntity.class)
-        .setParameter("rid", realm.getId())
-        .setParameter("name", organizationHint.trim())
-        .setMaxResults(1)
-        .getResultStream()
-        .findFirst()
-        .orElse(null);
-  }
-
   private LoginText loginText(String locale) {
     String normalized = locale == null ? "en" : locale.toLowerCase(Locale.ROOT);
     if (normalized.startsWith("es")) {
@@ -807,6 +803,7 @@ public class AuthorizationResource {
           "requerido para este dominio",
           "Usuario o contraseña incorrectos. Inténtelo de nuevo.",
           "Este dominio requiere un autenticador inscrito antes de iniciar sesión.",
+          "No tiene acceso a esta organización.",
           "No se pudo iniciar sesión. Inténtelo de nuevo.",
           "o continuar con",
           "Cliente");
@@ -821,6 +818,7 @@ public class AuthorizationResource {
           "obligatoire pour ce domaine",
           "Nom d'utilisateur ou mot de passe incorrect. Réessayez.",
           "Ce domaine exige un authentificateur inscrit avant la connexion.",
+          "Vous n'avez pas accès à cette organisation.",
           "Échec de la connexion. Réessayez.",
           "ou continuer avec",
           "Client");
@@ -835,6 +833,7 @@ public class AuthorizationResource {
           "इस रियल्म के लिए आवश्यक",
           "उपयोगकर्ता नाम या पासवर्ड गलत है। फिर से प्रयास करें।",
           "इस रियल्म में साइन इन से पहले ऑथेन्टिकेटर नामांकन आवश्यक है।",
+          "आपको इस संगठन तक पहुंच नहीं है।",
           "साइन इन विफल हुआ। फिर से प्रयास करें।",
           "या इसके साथ जारी रखें",
           "क्लाइंट");
@@ -848,6 +847,7 @@ public class AuthorizationResource {
         "required for this realm",
         "Incorrect username or password. Please try again.",
         "This realm requires an enrolled authenticator before sign-in.",
+        "You do not have access to this organization.",
         "Sign-in failed. Please try again.",
         "or continue with",
         "Client");

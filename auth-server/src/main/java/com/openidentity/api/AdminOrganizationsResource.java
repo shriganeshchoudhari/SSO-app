@@ -5,6 +5,7 @@ import com.openidentity.domain.OrganizationEntity;
 import com.openidentity.domain.OrganizationMemberEntity;
 import com.openidentity.domain.RealmEntity;
 import com.openidentity.domain.UserEntity;
+import com.openidentity.service.OrganizationPolicyService;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import jakarta.inject.Inject;
@@ -46,6 +47,7 @@ public class AdminOrganizationsResource {
   private static final Pattern LOCALE = Pattern.compile("^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{2,8})*$");
 
   @Inject EntityManager em;
+  @Inject OrganizationPolicyService organizationPolicyService;
 
   // ── Organization CRUD ─────────────────────────────────────────────────────
 
@@ -97,6 +99,10 @@ public class AdminOrganizationsResource {
     org.setAccentColor(normalizeColor(req.accentColor, "accentColor"));
     org.setLocale(normalizeLocale(req.locale));
     org.setEnabled(req.enabled != null ? req.enabled : Boolean.TRUE);
+    org.setRequireMembershipForLogin(
+        req.requireMembershipForLogin != null ? req.requireMembershipForLogin : Boolean.FALSE);
+    org.setAllowedEmailDomainsRaw(
+        organizationPolicyService.normalizeAllowedEmailDomains(req.allowedEmailDomains));
     org.setCreatedAt(OffsetDateTime.now());
     em.persist(org);
 
@@ -131,6 +137,13 @@ public class AdminOrganizationsResource {
     if (req.accentColor != null) org.setAccentColor(normalizeColor(req.accentColor, "accentColor"));
     if (req.locale != null) org.setLocale(normalizeLocale(req.locale));
     if (req.enabled     != null) org.setEnabled(req.enabled);
+    if (req.requireMembershipForLogin != null) {
+      org.setRequireMembershipForLogin(req.requireMembershipForLogin);
+    }
+    if (req.allowedEmailDomains != null) {
+      org.setAllowedEmailDomainsRaw(
+          organizationPolicyService.normalizeAllowedEmailDomains(req.allowedEmailDomains));
+    }
     em.merge(org);
     return toResponse(org);
   }
@@ -258,7 +271,9 @@ public class AdminOrganizationsResource {
     return new OrganizationResponse(
         o.getId(), o.getRealm().getId(), o.getName(),
         o.getDisplayName(), o.getLogoText(), o.getPrimaryColor(), o.getAccentColor(),
-        o.getLocale(), o.getEnabled(), o.getCreatedAt());
+        o.getLocale(), o.getEnabled(), o.getRequireMembershipForLogin(),
+        organizationPolicyService.parseAllowedEmailDomains(o.getAllowedEmailDomainsRaw()),
+        o.getCreatedAt());
   }
 
   private MemberResponse toMemberResponse(OrganizationMemberEntity m) {

@@ -107,6 +107,7 @@ F:\SSO-app\auth-server\src\main\java\com\openidentity\service\OidcBrokerService.
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\OidcClientService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\OidcConsentService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\OidcGrantService.java
+F:\SSO-app\auth-server\src\main\java\com\openidentity\service\OrganizationPolicyService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\RateLimitService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\RealmConfigService.java
 F:\SSO-app\auth-server\src\main\java\com\openidentity\service\SamlAssertionService.java

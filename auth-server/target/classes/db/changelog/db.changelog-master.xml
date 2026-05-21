@@ -984,4 +984,39 @@
         </preConditions>
         <sqlFile relativeToChangelogFile="true" path="0028-webhooks-oracle.sql" endDelimiter=";" splitStatements="true" />
     </changeSet>
+
+    <changeSet id="0029-organization-policy-and-broker-state-postgresql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0029-organization-policy-and-broker-state.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0029-organization-policy-and-broker-state-h2" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="h2"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0029-organization-policy-and-broker-state-h2.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0029-organization-policy-and-broker-state-mysql" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mysql"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0029-organization-policy-and-broker-state-mysql.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0029-organization-policy-and-broker-state-mariadb" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="mariadb"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0029-organization-policy-and-broker-state-mariadb.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
+
+    <changeSet id="0029-organization-policy-and-broker-state-oracle" author="openidentity">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="oracle"/>
+        </preConditions>
+        <sqlFile relativeToChangelogFile="true" path="0029-organization-policy-and-broker-state-oracle.sql" endDelimiter=";" splitStatements="true" />
+    </changeSet>
 </databaseChangeLog>

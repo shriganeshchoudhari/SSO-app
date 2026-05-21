@@ -61,6 +61,15 @@ secrets:
 metrics:
   enabled: true
 
+redis:
+  enabled: true
+  image: redis:7-alpine
+  storage: 1Gi
+  healthEnabled: true
+
+alerts:
+  enabled: false
+
 # Pod disruption budget
 podDisruptionBudget:
   enabled: true

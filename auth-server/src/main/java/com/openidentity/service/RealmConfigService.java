@@ -44,6 +44,7 @@ public class RealmConfigService {
   private static final String MFA_POLICY_REQUIRED = "required";
 
   @Inject EntityManager em;
+  @Inject OrganizationPolicyService organizationPolicyService;
   @Inject SecretProtectionService secretProtectionService;
   @Inject ScimProvisioningSettingsService scimProvisioningSettingsService;
   @Inject WebhookDeliveryService webhookDeliveryService;
@@ -189,6 +190,11 @@ public class RealmConfigService {
     config.accentColor = organization.getAccentColor();
     config.locale = organization.getLocale();
     config.enabled = organization.getEnabled();
+    config.requireMembershipForLogin = organization.getRequireMembershipForLogin();
+    config.allowedEmailDomains =
+        new ArrayList<>(
+            organizationPolicyService.parseAllowedEmailDomains(
+                organization.getAllowedEmailDomainsRaw()));
     return config;
   }
 
@@ -474,6 +480,12 @@ public class RealmConfigService {
       organization.setAccentColor(normalizeNullable(config.accentColor));
       organization.setLocale(normalizeNullable(config.locale));
       organization.setEnabled(config.enabled != null ? config.enabled : Boolean.TRUE);
+      organization.setRequireMembershipForLogin(
+          config.requireMembershipForLogin != null
+              ? config.requireMembershipForLogin
+              : Boolean.FALSE);
+      organization.setAllowedEmailDomainsRaw(
+          organizationPolicyService.normalizeAllowedEmailDomains(config.allowedEmailDomains));
       if (created) {
         em.persist(organization);
       }

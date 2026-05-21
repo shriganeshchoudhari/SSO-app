@@ -52,6 +52,8 @@ public class RealmConfigDtos {
     public String accentColor;
     public String locale;
     public Boolean enabled;
+    public Boolean requireMembershipForLogin;
+    public List<String> allowedEmailDomains = new ArrayList<>();
   }
 
   public static class LdapProviderConfig {

@@ -1,7 +1,7 @@
 # Deployment and Operations - OpenIdentity
 
 ## Document Intent
-This document describes the current deployment assets and the canonical local runtime path from the repository as it exists today. It is delivery-accurate: it separates what is already runnable from what still remains as Phase 5 hardening work.
+This document describes the current deployment assets and the canonical local runtime path from the repository as it exists today. It is delivery-accurate: it separates what is already shipped in source control from the environment-dependent validation steps that still require a working Docker daemon in the current session.
 
 ## Current Deployment Assets
 
@@ -84,17 +84,18 @@ The authoritative operator-facing instructions for the Docker-first local enviro
 - Deterministic local bootstrap data exists
 - LDAP, OIDC broker, SAML broker, and SCIM outbound all have local mock or local-service coverage in the full profile
 - Backend health, readiness, metrics, and tracing surfaces exist
+- Redis-backed shared rate limiting is enabled in the shipped Compose, Kubernetes, and Helm deployment paths
+- DB-backed sessions are refreshed on verified bearer traffic, preserving multi-replica session freshness semantics
+- Raw Kubernetes and Helm optional alert-rule assets now exist alongside the Grafana dashboard and OTel collector config
 - CI includes build, test, dependency audit, image scanning, and staging smoke coverage
 
 ### What Still Remains
-- Full compose verification depends on a working local Docker daemon
+- End-to-end compose validation still depends on a working local Docker daemon
 - The SAML local service is a deterministic shim for local broker testing, not a production IdP deployment
-- Shared HA session state is still not fully externalized
-- Production rollout hardening, alerting, and broader HA behavior remain Phase 5 work
+- Tracked generated outputs under `auth-server/target/*` still dirty the worktree after backend test runs
 
-## Production and Later-Phase Gaps
-- Full HA session/state externalization
-- Broader operational alerting and dashboards
+## Future Enhancements Beyond the Current Baseline
+- Broader operational dashboard polish
 - Production-grade reverse proxy, TLS, and ingress hardening
 - Zero-downtime rollout procedures
 - Stronger multi-environment deployment promotion and release automation

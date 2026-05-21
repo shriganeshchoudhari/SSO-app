@@ -38,6 +38,12 @@ public class OrganizationEntity {
   @Column(name = "enabled", nullable = false)
   private Boolean enabled = Boolean.TRUE;
 
+  @Column(name = "require_membership_for_login", nullable = false)
+  private Boolean requireMembershipForLogin = Boolean.FALSE;
+
+  @Column(name = "allowed_email_domains", length = 2000)
+  private String allowedEmailDomainsRaw;
+
   @Column(name = "created_at", nullable = false)
   private OffsetDateTime createdAt;
 
@@ -67,6 +73,16 @@ public class OrganizationEntity {
 
   public Boolean getEnabled() { return enabled; }
   public void setEnabled(Boolean enabled) { this.enabled = enabled; }
+
+  public Boolean getRequireMembershipForLogin() { return requireMembershipForLogin; }
+  public void setRequireMembershipForLogin(Boolean requireMembershipForLogin) {
+    this.requireMembershipForLogin = requireMembershipForLogin;
+  }
+
+  public String getAllowedEmailDomainsRaw() { return allowedEmailDomainsRaw; }
+  public void setAllowedEmailDomainsRaw(String allowedEmailDomainsRaw) {
+    this.allowedEmailDomainsRaw = allowedEmailDomainsRaw;
+  }
 
   public OffsetDateTime getCreatedAt() { return createdAt; }
   public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }

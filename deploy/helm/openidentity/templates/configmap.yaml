@@ -11,3 +11,8 @@ data:
   DB_USERNAME: {{ .Values.postgres.username | quote }}
   HTTP_PORT: {{ .Values.config.httpPort | quote }}
   SESSION_IDLE_TIMEOUT_SECONDS: {{ .Values.config.sessionIdleTimeoutSeconds | quote }}
+  OPENIDENTITY_RATE_LIMIT_REDIS_ENABLED: {{ ternary "true" "false" .Values.redis.enabled | quote }}
+  OPENIDENTITY_REDIS_HEALTH_ENABLED: {{ ternary "true" "false" (and .Values.redis.enabled .Values.redis.healthEnabled) | quote }}
+  {{- if .Values.redis.enabled }}
+  REDIS_URL: "redis://{{ include "openidentity.fullname" . }}-redis:6379"
+  {{- end }}

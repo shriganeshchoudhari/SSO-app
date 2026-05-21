@@ -54,6 +54,7 @@ public class SamlBrokerResource {
       @QueryParam("state") String state,
       @QueryParam("code_challenge") String codeChallenge,
       @QueryParam("code_challenge_method") String codeChallengeMethod,
+      @QueryParam("organization") String organization,
       @Context UriInfo uriInfo) {
     try {
       RealmEntity realm = requireRealm(realmName);
@@ -68,6 +69,7 @@ public class SamlBrokerResource {
           state,
           codeChallenge,
           codeChallengeMethod,
+          organization,
           acsUri(uriInfo, realmName, alias),
           spEntityId(uriInfo, realmName, alias));
       observabilityService.recordBrokerFlow("saml", "login", "success");

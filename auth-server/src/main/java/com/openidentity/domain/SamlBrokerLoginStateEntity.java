@@ -50,6 +50,9 @@ public class SamlBrokerLoginStateEntity {
   @Column(name = "authn_request_id", length = 255)
   private String authnRequestId;
 
+  @Column(name = "organization_hint", length = 255)
+  private String organizationHint;
+
   @Column(name = "expires_at", nullable = false)
   private OffsetDateTime expiresAt;
 
@@ -145,6 +148,14 @@ public class SamlBrokerLoginStateEntity {
 
   public void setAuthnRequestId(String authnRequestId) {
     this.authnRequestId = authnRequestId;
+  }
+
+  public String getOrganizationHint() {
+    return organizationHint;
+  }
+
+  public void setOrganizationHint(String organizationHint) {
+    this.organizationHint = organizationHint;
   }
 
   public OffsetDateTime getExpiresAt() {

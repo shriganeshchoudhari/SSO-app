@@ -27,6 +27,7 @@ public class SamlBrokerService {
   @Inject SamlAssertionService samlAssertionService;
   @Inject OidcConsentService oidcConsentService;
   @Inject FederationPolicyService federationPolicyService;
+  @Inject OrganizationPolicyService organizationPolicyService;
   @Inject SamlSpKeyService samlSpKeyService;
 
   public record SamlBrokerCallbackResult(URI clientRedirect, UserEntity user) {}
@@ -41,6 +42,7 @@ public class SamlBrokerService {
       String originalState,
       String codeChallenge,
       String codeChallengeMethod,
+      String organizationHint,
       URI acsUri,
       String spEntityId) {
     String relayState = SecurityTokenService.generateToken();
@@ -57,6 +59,7 @@ public class SamlBrokerService {
     entity.setCodeChallenge(codeChallenge);
     entity.setCodeChallengeMethod(codeChallengeMethod);
     entity.setAuthnRequestId(authnRequestId);
+    entity.setOrganizationHint(organizationHint);
     entity.setCreatedAt(OffsetDateTime.now());
     entity.setExpiresAt(SecurityTokenService.expiresIn(Duration.ofMinutes(10)));
     em.persist(entity);
@@ -89,7 +92,24 @@ public class SamlBrokerService {
     } catch (IllegalArgumentException | IllegalStateException e) {
       throw samlError("invalid_request", Response.Status.BAD_REQUEST);
     }
-    UserEntity user = findOrProvisionUser(realm, provider, profile);
+    UserEntity existingUser = findMatchingUser(realm, provider, profile);
+    try {
+      organizationPolicyService.enforceBrokerLogin(
+          realm, loginState.getOrganizationHint(), existingUser, profile.email());
+    } catch (WebApplicationException e) {
+      if ("organization_access_denied".equals(e.getMessage())) {
+        return new SamlBrokerCallbackResult(
+            redirectWithClientParams(
+                loginState.getRedirectUri(),
+                "error",
+                "access_denied",
+                "state",
+                loginState.getOriginalState()),
+            existingUser);
+      }
+      throw e;
+    }
+    UserEntity user = materializeUser(realm, provider, profile, existingUser);
     URI nextLocation =
         oidcConsentService
             .completeAuthorizationOrBeginConsent(
@@ -101,7 +121,7 @@ public class SamlBrokerService {
                 loginState.getOriginalState(),
                 loginState.getCodeChallenge(),
                 loginState.getCodeChallengeMethod(),
-                null,
+                loginState.getOrganizationHint(),
                 "saml_broker",
                 provider.getAlias())
             .redirectUri();
@@ -182,7 +202,7 @@ public class SamlBrokerService {
     return entity;
   }
 
-  private UserEntity findOrProvisionUser(
+  private UserEntity findMatchingUser(
       RealmEntity realm,
       SamlIdentityProviderEntity provider,
       SamlAssertionService.SamlProfile profile) {
@@ -218,7 +238,14 @@ public class SamlBrokerService {
           .findFirst()
           .orElse(null);
     }
+    return user;
+  }
 
+  private UserEntity materializeUser(
+      RealmEntity realm,
+      SamlIdentityProviderEntity provider,
+      SamlAssertionService.SamlProfile profile,
+      UserEntity user) {
     if (user == null) {
       user = new UserEntity();
       user.setId(UUID.randomUUID());
@@ -254,6 +281,17 @@ public class SamlBrokerService {
       builder.append('&');
     }
     builder.append(urlEncode(key)).append('=').append(urlEncode(value == null ? "" : value));
+  }
+
+  private URI redirectWithClientParams(
+      String redirectUri, String key1, String value1, String key2, String value2) {
+    StringBuilder builder = new StringBuilder(redirectUri);
+    builder.append(redirectUri.contains("?") ? '&' : '?');
+    appendParam(builder, key1, value1);
+    if (value2 != null) {
+      appendParam(builder, key2, value2);
+    }
+    return URI.create(builder.toString());
   }
 
   private String urlEncode(String value) {

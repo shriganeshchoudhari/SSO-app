@@ -452,6 +452,136 @@ public class OidcBrokerFlowTest {
         .body("access_token", notNullValue());
   }
 
+  @Test
+  void oidc_broker_login_enforces_organization_policy() {
+    Response realmResp = adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.of("name", "broker-org-policy", "displayName", "Broker Org Policy"))
+        .when().post("/admin/realms")
+        .then().statusCode(anyOf(is(200), is(201)))
+        .extract().response();
+    String realmId = realmResp.jsonPath().getString("id");
+
+    adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.ofEntries(
+            new AbstractMap.SimpleEntry<>("clientId", "broker-org-web"),
+            new AbstractMap.SimpleEntry<>("protocol", "openid-connect"),
+            new AbstractMap.SimpleEntry<>("publicClient", true),
+            new AbstractMap.SimpleEntry<>("redirectUris", List.of("http://client.example/org-callback")),
+            new AbstractMap.SimpleEntry<>("grantTypes", List.of("authorization_code", "refresh_token"))))
+        .when().post("/admin/realms/" + realmId + "/clients")
+        .then().statusCode(anyOf(is(200), is(201)));
+
+    String localUserId = adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.of("username", "brokered-user", "email", "brokered-user@example.com", "enabled", true))
+        .when().post("/admin/realms/" + realmId + "/users")
+        .then().statusCode(anyOf(is(200), is(201)))
+        .extract().response().jsonPath().getString("id");
+
+    String orgId = adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.of(
+            "name", "acme-org",
+            "displayName", "Acme Org",
+            "requireMembershipForLogin", true,
+            "allowedEmailDomains", List.of("example.com")))
+        .when().post("/admin/realms/" + realmId + "/organizations")
+        .then().statusCode(anyOf(is(200), is(201)))
+        .extract().response().jsonPath().getString("id");
+
+    adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.of("userId", localUserId, "orgRole", "member"))
+        .when().post("/admin/realms/" + realmId + "/organizations/" + orgId + "/members")
+        .then().statusCode(anyOf(is(200), is(201)));
+
+    adminRequest()
+        .contentType(ContentType.JSON)
+        .body(Map.ofEntries(
+            new AbstractMap.SimpleEntry<>("alias", "google"),
+            new AbstractMap.SimpleEntry<>("issuerUrl", "https://accounts.google.com"),
+            new AbstractMap.SimpleEntry<>("authorizationUrl", "https://accounts.google.com/o/oauth2/v2/auth"),
+            new AbstractMap.SimpleEntry<>("tokenUrl", "https://oauth2.googleapis.com/token"),
+            new AbstractMap.SimpleEntry<>("userInfoUrl", "https://openidconnect.googleapis.com/v1/userinfo"),
+            new AbstractMap.SimpleEntry<>("jwksUrl", "https://www.googleapis.com/oauth2/v3/certs"),
+            new AbstractMap.SimpleEntry<>("clientId", "google-client"),
+            new AbstractMap.SimpleEntry<>("clientSecret", "GoogleClientSecret123!"),
+            new AbstractMap.SimpleEntry<>("scopes", List.of("openid", "profile", "email")),
+            new AbstractMap.SimpleEntry<>("usernameClaim", "preferred_username"),
+            new AbstractMap.SimpleEntry<>("emailClaim", "email"),
+            new AbstractMap.SimpleEntry<>("syncAttributesOnLogin", true),
+            new AbstractMap.SimpleEntry<>("enabled", true)))
+        .when().post("/admin/realms/" + realmId + "/brokering/oidc")
+        .then().statusCode(anyOf(is(200), is(201)));
+
+    String codeVerifier = "broker-org-policy-verifier-123456789";
+    String codeChallenge = OidcGrantService.codeChallenge(codeVerifier);
+
+    Response allowedStart = given()
+        .redirects().follow(false)
+        .queryParam("response_type", "code")
+        .queryParam("client_id", "broker-org-web")
+        .queryParam("redirect_uri", "http://client.example/org-callback")
+        .queryParam("scope", "openid profile email")
+        .queryParam("state", "org-state-allow")
+        .queryParam("code_challenge", codeChallenge)
+        .queryParam("code_challenge_method", "S256")
+        .queryParam("organization", "acme-org")
+        .when().get("/auth/realms/broker-org-policy/broker/oidc/google/login")
+        .then().statusCode(anyOf(is(302), is(303)))
+        .extract().response();
+
+    String allowBrokerState = queryValue(URI.create(allowedStart.getHeader("Location")), "state");
+    Response allowedCallback = given()
+        .redirects().follow(false)
+        .queryParam("code", "mock-google-code")
+        .queryParam("state", allowBrokerState)
+        .when().get("/auth/realms/broker-org-policy/broker/oidc/google/callback")
+        .then().statusCode(anyOf(is(302), is(303)))
+        .extract().response();
+
+    URI allowedClientRedirect = URI.create(allowedCallback.getHeader("Location"));
+    if (queryValue(allowedClientRedirect, "code") == null) {
+      throw new AssertionError("authorized org member did not receive a local authorization code");
+    }
+
+    Response deniedStart = given()
+        .redirects().follow(false)
+        .queryParam("response_type", "code")
+        .queryParam("client_id", "broker-org-web")
+        .queryParam("redirect_uri", "http://client.example/org-callback")
+        .queryParam("scope", "openid profile email")
+        .queryParam("state", "org-state-deny")
+        .queryParam("code_challenge", codeChallenge)
+        .queryParam("code_challenge_method", "S256")
+        .queryParam("organization", "acme-org")
+        .when().get("/auth/realms/broker-org-policy/broker/oidc/google/login")
+        .then().statusCode(anyOf(is(302), is(303)))
+        .extract().response();
+
+    String denyBrokerState = queryValue(URI.create(deniedStart.getHeader("Location")), "state");
+    Response deniedCallback = given()
+        .redirects().follow(false)
+        .queryParam("code", "mock-google-code-uninvited")
+        .queryParam("state", denyBrokerState)
+        .when().get("/auth/realms/broker-org-policy/broker/oidc/google/callback")
+        .then().statusCode(anyOf(is(302), is(303)))
+        .extract().response();
+
+    URI deniedClientRedirect = URI.create(deniedCallback.getHeader("Location"));
+    if (!"access_denied".equals(queryValue(deniedClientRedirect, "error"))
+        || !"org-state-deny".equals(queryValue(deniedClientRedirect, "state"))) {
+      throw new AssertionError("organization policy denial was not propagated back to the client");
+    }
+
+    adminRequest()
+        .when().get("/admin/realms/" + realmId + "/users")
+        .then().statusCode(200)
+        .body("username", org.hamcrest.Matchers.not(hasItem("uninvited-user")));
+  }
+
   private String queryValue(URI uri, String key) {
     if (uri.getQuery() == null) {
       return null;
