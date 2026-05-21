@@ -2,6 +2,8 @@ package com.openidentity.domain;
 
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "admin_audit_event")
@@ -31,9 +33,11 @@ public class AdminAuditEventEntity {
   @Column(name = "time", nullable = false)
   private OffsetDateTime time;
 
+  @JdbcTypeCode(SqlTypes.INET)
   @Column(name = "ip_address")
   private String ipAddress;
 
+  @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "details")
   private String details;
 
@@ -63,4 +67,3 @@ public class AdminAuditEventEntity {
   public String getDetails() { return details; }
   public void setDetails(String details) { this.details = details; }
 }
-

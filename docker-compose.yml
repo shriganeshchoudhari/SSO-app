@@ -118,7 +118,9 @@ services:
         condition: service_healthy
 
   openldap:
-    image: osixia/openldap:1.5.0
+    build:
+      context: deploy/local/openldap
+      dockerfile: Dockerfile
     container_name: openidentity-openldap
     restart: unless-stopped
     profiles: ["full"]
@@ -129,8 +131,6 @@ services:
       LDAP_TLS: "false"
     ports:
       - "3890:389"
-    volumes:
-      - ./deploy/local/openldap/01-demo-users.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/01-demo-users.ldif:ro
     healthcheck:
       test: ["CMD-SHELL", "ldapsearch -x -H ldap://localhost:389 -D 'cn=admin,dc=example,dc=org' -w admin -b 'ou=people,dc=example,dc=org' '(uid=ldap.user)' >/dev/null 2>&1 || exit 1"]
       interval: 15s
@@ -173,7 +173,7 @@ services:
       auth-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8090/health >/dev/null 2>&1 || exit 1"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8090/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -196,7 +196,7 @@ services:
     ports:
       - "8082:8082"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/health >/dev/null 2>&1 || exit 1"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8082/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 5
